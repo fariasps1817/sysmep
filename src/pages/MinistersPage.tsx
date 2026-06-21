@@ -26,13 +26,17 @@ import {
   IconAlertCircle,
   IconUserOff,
   IconCalendarOff,
+  IconFileTypePdf,
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
-import type { Ministro } from '../lib/types'
+import type { Ministro, ConfigParoquia } from '../lib/types'
 import { formatarBR } from '../lib/datas'
 import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '../lib/texto'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
+import { ListaPDF } from '../pdf/ListaPDF'
+import { baixarPdfDoc } from '../pdf/baixar'
+import brasaoPadrao from '../assets/brasao.png'
 
 type FormValores = {
   nomeCompleto: string
@@ -74,6 +78,8 @@ export function MinistersPage() {
     queryKey: ['ministros'],
     queryFn: () => api.get<Ministro[]>('/api/ministers'),
   })
+
+  const { data: paroquia } = useQuery({ queryKey: ['config-paroquia'], queryFn: () => api.get<ConfigParoquia | null>('/api/parish-settings') })
 
   const { data: restricoes } = useQuery({
     queryKey: ['availability-todas'],
@@ -157,6 +163,34 @@ export function MinistersPage() {
     })
   }
 
+  function exportarPdf() {
+    const linhas = (data ?? []).map((m) => ({
+      nome: m.nomeCompleto,
+      telefone: m.whatsapp || '—',
+      aniversario: formatarBR(m.dataNascimento),
+      mesc: m.ministroEucaristia ? 'Sim' : 'Não',
+      status: m.ativo ? 'Ativo' : 'Inativo',
+    }))
+    baixarPdfDoc(
+      <ListaPDF
+        titulo="Ministros da Palavra"
+        subtitulo={`${linhas.length} cadastrado(s)`}
+        parishNome={paroquia?.nomeParoquia ?? 'Paróquia'}
+        cidade={paroquia?.cidade}
+        logo={paroquia?.logoBase64 || brasaoPadrao}
+        colunas={[
+          { titulo: 'Nome', chave: 'nome', flex: 2.4 },
+          { titulo: 'Telefone', chave: 'telefone', flex: 1.4 },
+          { titulo: 'Aniversário', chave: 'aniversario', flex: 1.2 },
+          { titulo: 'MESC', chave: 'mesc', flex: 0.7 },
+          { titulo: 'Status', chave: 'status', flex: 0.9 },
+        ]}
+        linhas={linhas}
+      />,
+      'ministros.pdf',
+    )
+  }
+
   const detalhe = (data ?? []).find((m) => m.id === detalheId) ?? null
 
   return (
@@ -168,7 +202,12 @@ export function MinistersPage() {
             {data ? `${data.length} cadastrado(s) · ${data.filter((m) => m.ativo).length} ativo(s)` : 'Cadastro dos Ministros da Palavra'}
           </Text>
         </div>
-        <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Novo ministro</Button>
+        <Group gap="xs">
+          <Button variant="default" leftSection={<IconFileTypePdf size={18} />} onClick={exportarPdf} disabled={!data?.length}>
+            Exportar PDF
+          </Button>
+          <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Novo ministro</Button>
+        </Group>
       </Group>
 
       {isError && (
@@ -260,7 +299,7 @@ export function MinistersPage() {
                 error={form.errors.dataNascimento}
               />
               <TextInput
-                label="Ordenado(a) no ministério desde"
+                label="Data ordem MEP"
                 placeholder="DD/MM/AAAA"
                 inputMode="numeric"
                 value={form.values.ordenadoEm}
@@ -269,8 +308,8 @@ export function MinistersPage() {
               />
             </Group>
             <Group>
-              <Switch label="Também Ministro da Eucaristia (MESC)" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
-              <Switch label="Ativo para a escala" {...form.getInputProps('ativo', { type: 'checkbox' })} />
+              <Switch label="Também MESC" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
+              <Switch label="Ativo para escala" {...form.getInputProps('ativo', { type: 'checkbox' })} />
             </Group>
             <Group justify="flex-end" mt="sm">
               <Button variant="default" onClick={fechar}>Cancelar</Button>

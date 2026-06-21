@@ -26,12 +26,16 @@ import {
   IconAlertCircle,
   IconBuildingChurch,
   IconCalendarEvent,
+  IconFileTypePdf,
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
-import type { Comunidade } from '../lib/types'
+import type { Comunidade, ConfigParoquia } from '../lib/types'
 import type { Regra } from '../lib/celebracao'
 import { tituloCaso, mascaraTelefone } from '../lib/texto'
 import { CelebrationRulesDrawer } from '../components/CelebrationRulesDrawer'
+import { ListaPDF } from '../pdf/ListaPDF'
+import { baixarPdfDoc } from '../pdf/baixar'
+import brasaoPadrao from '../assets/brasao.png'
 
 type FormValores = {
   nome: string
@@ -72,6 +76,8 @@ export function CommunitiesPage() {
     queryKey: ['rules-todas'],
     queryFn: () => api.get<Regra[]>('/api/rules'),
   })
+
+  const { data: paroquia } = useQuery({ queryKey: ['config-paroquia'], queryFn: () => api.get<ConfigParoquia | null>('/api/parish-settings') })
 
   function resumoCelebracoes(comunidadeId: number) {
     const lista = (regras ?? []).filter((r) => r.communityId === comunidadeId)
@@ -149,6 +155,40 @@ export function CommunitiesPage() {
     })
   }
 
+  function exportarPdf() {
+    const linhas = (data ?? []).map((c) => {
+      const s = resumoCelebracoes(c.id)
+      return {
+        nome: c.nome,
+        padroeiro: c.nomePadroeiro || '—',
+        representante: c.coordenadorNome || '—',
+        whatsapp: c.coordenadorWhatsapp || '—',
+        celebracoes: s.total === 0 ? '—' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`,
+        situacao: c.ativo ? 'Ativa' : 'Inativa',
+      }
+    })
+    baixarPdfDoc(
+      <ListaPDF
+        titulo="Comunidades"
+        subtitulo={`${linhas.length} cadastrada(s)`}
+        parishNome={paroquia?.nomeParoquia ?? 'Paróquia'}
+        cidade={paroquia?.cidade}
+        logo={paroquia?.logoBase64 || brasaoPadrao}
+        orientacao="landscape"
+        colunas={[
+          { titulo: 'Nome', chave: 'nome', flex: 1.6 },
+          { titulo: 'Padroeiro(a)', chave: 'padroeiro', flex: 1.4 },
+          { titulo: 'Representante', chave: 'representante', flex: 1.4 },
+          { titulo: 'WhatsApp', chave: 'whatsapp', flex: 1.2 },
+          { titulo: 'Celebrações', chave: 'celebracoes', flex: 1.4 },
+          { titulo: 'Situação', chave: 'situacao', flex: 0.8 },
+        ]}
+        linhas={linhas}
+      />,
+      'comunidades.pdf',
+    )
+  }
+
   const detalhe = (data ?? []).find((c) => c.id === detalheId) ?? null
 
   return (
@@ -158,7 +198,12 @@ export function CommunitiesPage() {
           <Title order={2}>Comunidades</Title>
           <Text c="dimmed" size="sm">{data ? `${data.length} cadastrada(s)` : 'Cadastro das comunidades/capelas'}</Text>
         </div>
-        <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Nova comunidade</Button>
+        <Group gap="xs">
+          <Button variant="default" leftSection={<IconFileTypePdf size={18} />} onClick={exportarPdf} disabled={!data?.length}>
+            Exportar PDF
+          </Button>
+          <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Nova comunidade</Button>
+        </Group>
       </Group>
 
       {isError && (

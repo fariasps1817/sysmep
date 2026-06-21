@@ -13,7 +13,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
-import { IconCake, IconBrandWhatsapp } from '@tabler/icons-react'
+import { IconCake, IconBrandWhatsapp, IconFileTypePdf } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro, ConfigParoquia } from '../lib/types'
 import { formatarBR } from '../lib/datas'
@@ -21,6 +21,9 @@ import { normalizarWhatsapp } from '../lib/whatsapp'
 import { mensagemAniversario } from '../lib/mensagens'
 import { nomeMes } from '../scheduler/datas'
 import { EnvioWhatsappModal, type MensagemEnvio } from '../components/EnvioWhatsappModal'
+import { ListaPDF } from '../pdf/ListaPDF'
+import { baixarPdfDoc } from '../pdf/baixar'
+import brasaoPadrao from '../assets/brasao.png'
 
 export function BirthdaysPage() {
   const [mes, setMes] = useState(new Date().getMonth() + 1)
@@ -51,6 +54,32 @@ export function BirthdaysPage() {
     }))
   }
 
+  function exportarPdf() {
+    const linhas = aniversariantes.map(({ ministro: m, dia, idade }) => ({
+      dia: `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
+      nome: m.nomeCompleto,
+      idade: idade > 0 ? `${idade} anos` : '—',
+      whatsapp: m.whatsapp || '—',
+    }))
+    baixarPdfDoc(
+      <ListaPDF
+        titulo="Aniversariantes"
+        subtitulo={nomeMes(mes)}
+        parishNome={nomeParoquia}
+        cidade={paroquia?.cidade}
+        logo={paroquia?.logoBase64 || brasaoPadrao}
+        colunas={[
+          { titulo: 'Dia', chave: 'dia', flex: 0.6 },
+          { titulo: 'Nome', chave: 'nome', flex: 2 },
+          { titulo: 'Faz', chave: 'idade', flex: 0.8 },
+          { titulo: 'WhatsApp', chave: 'whatsapp', flex: 1.4 },
+        ]}
+        linhas={linhas}
+      />,
+      `aniversariantes-${String(mes).padStart(2, '0')}.pdf`,
+    )
+  }
+
   if (isLoading) return <Center py="xl"><Loader /></Center>
 
   const opcoesMes = Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: nomeMes(i + 1) }))
@@ -64,6 +93,14 @@ export function BirthdaysPage() {
         </div>
         <Group align="flex-end" gap="sm">
           <Select label="Mês" w={150} data={opcoesMes} value={String(mes)} onChange={(v) => v && setMes(Number(v))} allowDeselect={false} />
+          <Button
+            variant="default"
+            leftSection={<IconFileTypePdf size={18} />}
+            disabled={aniversariantes.length === 0}
+            onClick={exportarPdf}
+          >
+            Exportar PDF
+          </Button>
           <Button
             color="green"
             leftSection={<IconBrandWhatsapp size={18} />}
