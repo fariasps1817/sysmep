@@ -97,7 +97,12 @@ async function ministersHandler(event: HandlerEvent, metodo: string, id?: number
     return json(200, row[0])
   }
   if (metodo === 'DELETE' && id) {
-    await db.delete(ministers).where(eq(ministers.id, id))
+    try {
+      await db.delete(ministers).where(eq(ministers.id, id))
+    } catch (e) {
+      if (ehErroFK(e)) return erro(409, 'Não é possível remover: este ministro está em uma escala salva. Exclua a escala primeiro (em Escala do mês).')
+      throw e
+    }
     return json(200, { ok: true })
   }
   return erro(405, 'Método não permitido.')
@@ -138,7 +143,12 @@ async function communitiesHandler(event: HandlerEvent, metodo: string, id?: numb
     return json(200, row[0])
   }
   if (metodo === 'DELETE' && id) {
-    await db.delete(communities).where(eq(communities.id, id))
+    try {
+      await db.delete(communities).where(eq(communities.id, id))
+    } catch (e) {
+      if (ehErroFK(e)) return erro(409, 'Não é possível remover: esta comunidade está em uma escala salva. Exclua a escala primeiro (em Escala do mês).')
+      throw e
+    }
     return json(200, { ok: true })
   }
   return erro(405, 'Método não permitido.')
@@ -412,6 +422,12 @@ async function operatorsHandler(
 }
 
 // ---------- utilitários ----------
+// Detecta violação de chave estrangeira do Postgres (registro ainda referenciado).
+function ehErroFK(e: unknown): boolean {
+  const err = e as { code?: string; message?: string }
+  return err?.code === '23503' || /foreign key|violates foreign/i.test(String(err?.message ?? e))
+}
+
 function num(v: unknown): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
   const n = Number(v)
