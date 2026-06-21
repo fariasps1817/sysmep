@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   ActionIcon,
   Alert,
-  Badge,
   Button,
   Center,
   Group,
@@ -30,7 +29,6 @@ import {
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro } from '../lib/types'
-import { formatarBR } from '../lib/datas'
 import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '../lib/texto'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
@@ -185,9 +183,6 @@ export function MinistersPage() {
               <Table.Tr>
                 <Table.Th>Nome</Table.Th>
                 <Table.Th>WhatsApp</Table.Th>
-                <Table.Th>Bairro</Table.Th>
-                <Table.Th>Nascimento</Table.Th>
-                <Table.Th>MESC</Table.Th>
                 <Table.Th>Disponib.</Table.Th>
                 <Table.Th>Ativo</Table.Th>
                 <Table.Th ta="right">Ações</Table.Th>
@@ -201,9 +196,6 @@ export function MinistersPage() {
                     {m.tratamento && <Text size="xs" c="dimmed">{m.tratamento}</Text>}
                   </Table.Td>
                   <Table.Td>{m.whatsapp || '—'}</Table.Td>
-                  <Table.Td>{m.bairro || '—'}</Table.Td>
-                  <Table.Td>{formatarBR(m.dataNascimento)}</Table.Td>
-                  <Table.Td>{m.ministroEucaristia ? <Badge color="grape" variant="light">Sim</Badge> : '—'}</Table.Td>
                   <Table.Td>
                     <Button
                       variant="light"
