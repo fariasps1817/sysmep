@@ -24,13 +24,21 @@ import {
   IconLock,
   IconLockOpen,
   IconAlertTriangle,
+  IconBrandWhatsapp,
+  IconFileTypePdf,
 } from '@tabler/icons-react'
+import { pdf } from '@react-pdf/renderer'
 import { api } from '../lib/api'
-import type { Comunidade, Ministro } from '../lib/types'
+import type { Comunidade, Ministro, ConfigParoquia } from '../lib/types'
+import { EscalaPDF, type CelebracaoPDF } from '../pdf/EscalaPDF'
+import brasaoPadrao from '../assets/brasao.png'
 import type { Regra } from '../lib/celebracao'
 import { DIAS_CURTOS } from '../lib/celebracao'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { deISO } from '../lib/datas'
+import { normalizarWhatsapp } from '../lib/whatsapp'
+import { mensagemMinistro, mensagemRepresentante } from '../lib/mensagens'
+import { EnvioWhatsappModal, type MensagemEnvio } from '../components/EnvioWhatsappModal'
 import { expandirMes } from '../scheduler/expandir'
 import { bloqueadoNaData } from '../scheduler/elegibilidade'
 import { gerarEscala } from '../scheduler/gerar'
@@ -64,11 +72,13 @@ export function SchedulePage() {
   const [linhas, setLinhas] = useState<Record<string, LinhaInfo>>({})
   const [gerado, setGerado] = useState(false)
   const [status, setStatus] = useState<'rascunho' | 'publicada' | null>(null)
+  const [modalEnvio, setModalEnvio] = useState<{ titulo: string; descricao: string; mensagens: MensagemEnvio[] } | null>(null)
 
   const { data: comunidades } = useQuery({ queryKey: ['comunidades'], queryFn: () => api.get<Comunidade[]>('/api/communities') })
   const { data: regras } = useQuery({ queryKey: ['rules-todas'], queryFn: () => api.get<Regra[]>('/api/rules') })
   const { data: ministros } = useQuery({ queryKey: ['ministros'], queryFn: () => api.get<Ministro[]>('/api/ministers') })
   const { data: restricoes } = useQuery({ queryKey: ['availability-todas'], queryFn: () => api.get<Indisponibilidade[]>('/api/availability') })
+  const { data: paroquia } = useQuery({ queryKey: ['config-paroquia'], queryFn: () => api.get<ConfigParoquia | null>('/api/parish-settings') })
 
   const carregando = !comunidades || !regras || !ministros || !restricoes
 
@@ -82,6 +92,8 @@ export function SchedulePage() {
 
   const ministrosAtivos = useMemo(() => (ministros ?? []).filter((m) => m.ativo), [ministros])
   const nomeMinistro = useMemo(() => new Map((ministros ?? []).map((m) => [m.id, m.nomeCompleto])), [ministros])
+  const ministroById = useMemo(() => new Map((ministros ?? []).map((m) => [m.id, m])), [ministros])
+  const comunidadeById = useMemo(() => new Map((comunidades ?? []).map((c) => [c.id, c])), [comunidades])
   const restricoesPorMinistro = useMemo(() => {
     const map: Record<number, Indisponibilidade[]> = {}
     for (const r of restricoes ?? []) (map[r.ministerId] ??= []).push(r)
@@ -180,6 +192,99 @@ export function SchedulePage() {
     onError: (e: Error) => notifications.show({ color: 'red', title: 'Erro ao salvar', message: e.message }),
   })
 
+  function enviarMinistros() {
+    const mesAno = rotuloMesAno(mes, ano)
+    const porMin = new Map<number, { data: string; horario: string; communityNome: string }[]>()
+    for (const s of palavraSlots) {
+      const mid = linhas[s.id]?.ministerId
+      if (mid == null) continue
+      const arr = porMin.get(mid) ?? []
+      arr.push({ data: s.data, horario: s.horario, communityNome: s.communityNome })
+      porMin.set(mid, arr)
+    }
+    const mensagens: MensagemEnvio[] = []
+    for (const [mid, itens] of porMin) {
+      const m = ministroById.get(mid)
+      if (!m) continue
+      mensagens.push({
+        id: `m-${mid}`,
+        label: m.nomeCompleto,
+        para: normalizarWhatsapp(m.whatsapp),
+        mensagem: mensagemMinistro(m.tratamento, m.nomeCompleto, mesAno, itens),
+      })
+    }
+    mensagens.sort((a, b) => a.label.localeCompare(b.label))
+    setModalEnvio({
+      titulo: 'Enviar escala aos ministros',
+      descricao: `Cada ministro recebe sua escala individual de ${mesAno} por WhatsApp.`,
+      mensagens,
+    })
+  }
+
+  function enviarRepresentantes() {
+    const mesAno = rotuloMesAno(mes, ano)
+    const porCom = new Map<number, { data: string; horario: string; ministroNome: string | null }[]>()
+    for (const s of palavraSlots) {
+      const mid = linhas[s.id]?.ministerId ?? null
+      const arr = porCom.get(s.communityId) ?? []
+      arr.push({ data: s.data, horario: s.horario, ministroNome: mid != null ? nomeMinistro.get(mid) ?? null : null })
+      porCom.set(s.communityId, arr)
+    }
+    const mensagens: MensagemEnvio[] = []
+    for (const [cid, itens] of porCom) {
+      const c = comunidadeById.get(cid)
+      if (!c) continue
+      mensagens.push({
+        id: `c-${cid}`,
+        label: c.nome,
+        para: normalizarWhatsapp(c.coordenadorWhatsapp),
+        mensagem: mensagemRepresentante(c.nome, mesAno, itens),
+      })
+    }
+    mensagens.sort((a, b) => a.label.localeCompare(b.label))
+    setModalEnvio({
+      titulo: 'Enviar aos representantes das comunidades',
+      descricao: `Cada comunidade recebe a lista dos ministros de ${mesAno}.`,
+      mensagens,
+    })
+  }
+
+  async function baixarPdf() {
+    const porDia: Record<string, CelebracaoPDF[]> = {}
+    for (const sl of slots) {
+      const isMissa = sl.tipo === 'missa'
+      const mid = isMissa ? null : linhas[sl.id]?.ministerId ?? null
+      ;(porDia[sl.data] ??= []).push({
+        horario: sl.horario,
+        communityNome: sl.communityNome,
+        tipo: sl.tipo,
+        ministroNome: mid != null ? nomeMinistro.get(mid) ?? null : null,
+      })
+    }
+    for (const k of Object.keys(porDia)) {
+      porDia[k].sort((a, b) => a.horario.localeCompare(b.horario) || a.communityNome.localeCompare(b.communityNome))
+    }
+    const blob = await pdf(
+      <EscalaPDF
+        mes={mes}
+        ano={ano}
+        parishNome={paroquia?.nomeParoquia ?? 'Paróquia'}
+        cidade={paroquia?.cidade}
+        rodape={paroquia?.rodapePdf}
+        logo={paroquia?.logoBase64 || brasaoPadrao}
+        porDia={porDia}
+      />,
+    ).toBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `escala-${ano}-${String(mes).padStart(2, '0')}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   // Linhas para exibição (palavra + missa)
   const linhasExibicao = useMemo(() => {
     const palavra = palavraSlots.map((s) => ({ slot: s, info: linhas[s.id] }))
@@ -247,6 +352,15 @@ export function SchedulePage() {
               </Button>
               <Button color="teal" leftSection={<IconSend size={16} />} loading={salvar.isPending} onClick={() => salvar.mutate('publicada')}>
                 Publicar
+              </Button>
+              <Button variant="light" color="green" leftSection={<IconBrandWhatsapp size={16} />} onClick={enviarMinistros}>
+                Ministros
+              </Button>
+              <Button variant="light" color="green" leftSection={<IconBrandWhatsapp size={16} />} onClick={enviarRepresentantes}>
+                Representantes
+              </Button>
+              <Button variant="light" color="red" leftSection={<IconFileTypePdf size={16} />} onClick={baixarPdf}>
+                PDF
               </Button>
             </Group>
           </Group>
@@ -335,6 +449,14 @@ export function SchedulePage() {
           </Table>
         </Table.ScrollContainer>
       )}
+
+      <EnvioWhatsappModal
+        opened={modalEnvio !== null}
+        onClose={() => setModalEnvio(null)}
+        titulo={modalEnvio?.titulo ?? ''}
+        descricao={modalEnvio?.descricao}
+        mensagens={modalEnvio?.mensagens ?? []}
+      />
     </Stack>
   )
 }

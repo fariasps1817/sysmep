@@ -1,6 +1,26 @@
 import type { Handler } from '@netlify/functions'
+import { db } from '../../db/client'
+import { messageLog } from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
 import { lerSessao } from './_lib/auth'
+
+async function registrar(
+  dados: { tipo: string; destinatarioId?: number | null; scheduleId?: number | null; para: string; status: string; erro?: string | null },
+) {
+  try {
+    await db.insert(messageLog).values({
+      destinatarioTipo: dados.tipo,
+      destinatarioId: dados.destinatarioId ?? null,
+      scheduleId: dados.scheduleId ?? null,
+      canal: 'whatsapp',
+      para: dados.para,
+      status: dados.status,
+      erro: dados.erro ?? null,
+    })
+  } catch (e) {
+    console.error('Falha ao registrar message_log:', e)
+  }
+}
 
 // Envia uma mensagem de texto via API ENVIAME.
 // Credenciais ficam em variáveis de ambiente (nunca no cliente).
@@ -20,8 +40,16 @@ export const handler: Handler = async (event) => {
     return erro(503, 'WhatsApp não configurado: defina ENVIAME_INSTANCIA e ENVIAME_TOKEN no ambiente.')
   }
 
-  const { para, mensagem } = lerCorpo<{ para?: string; mensagem?: string }>(event)
+  const body = lerCorpo<{
+    para?: string
+    mensagem?: string
+    tipo?: string
+    destinatarioId?: number
+    scheduleId?: number
+  }>(event)
+  const { para, mensagem } = body
   if (!para || !mensagem) return erro(400, 'Informe "para" e "mensagem".')
+  const tipo = body.tipo ?? 'avulso'
 
   try {
     const resp = await fetch(url, {
@@ -31,11 +59,14 @@ export const handler: Handler = async (event) => {
     })
     const texto = await resp.text()
     if (!resp.ok) {
+      await registrar({ tipo, destinatarioId: body.destinatarioId, scheduleId: body.scheduleId, para, status: 'erro', erro: `${resp.status}: ${texto}`.slice(0, 500) })
       return erro(502, `Falha ao enviar (ENVIAME ${resp.status}): ${texto}`)
     }
+    await registrar({ tipo, destinatarioId: body.destinatarioId, scheduleId: body.scheduleId, para, status: 'enviado' })
     return json(200, { ok: true, resposta: texto })
   } catch (e) {
     console.error('Erro ao chamar ENVIAME:', e)
+    await registrar({ tipo, destinatarioId: body.destinatarioId, scheduleId: body.scheduleId, para, status: 'erro', erro: String(e).slice(0, 500) })
     return erro(502, 'Não foi possível contatar a API de WhatsApp.')
   }
 }
