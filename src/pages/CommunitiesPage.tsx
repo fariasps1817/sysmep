@@ -32,7 +32,7 @@ import {
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Comunidade, ConfigParoquia } from '../lib/types'
-import type { Regra } from '../lib/celebracao'
+import { formatarHora, DIAS_PLURAL, type Regra } from '../lib/celebracao'
 import { tituloCaso, mascaraTelefone } from '../lib/texto'
 import { CelebrationRulesDrawer } from '../components/CelebrationRulesDrawer'
 import { ListaPDF } from '../pdf/ListaPDF'
@@ -81,11 +81,13 @@ export function CommunitiesPage() {
 
   const { data: paroquia } = useQuery({ queryKey: ['config-paroquia'], queryFn: () => api.get<ConfigParoquia | null>('/api/parish-settings') })
 
-  function resumoCelebracoes(comunidadeId: number) {
-    const lista = (regras ?? []).filter((r) => r.communityId === comunidadeId)
-    const palavra = lista.filter((r) => r.tipo === 'palavra').length
-    const missa = lista.filter((r) => r.tipo === 'missa').length
-    return { total: lista.length, palavra, missa }
+  // Dias padrão (celebrações semanais), ex.: "Sábados 19h, Quintas 19h".
+  function diasPadrao(comunidadeId: number): string {
+    return (regras ?? [])
+      .filter((r) => r.communityId === comunidadeId && r.ativo && r.frequencia === 'weekly')
+      .sort((a, b) => a.weekday - b.weekday || a.horario.localeCompare(b.horario))
+      .map((r) => `${DIAS_PLURAL[r.weekday]} ${formatarHora(r.horario)}`)
+      .join(', ')
   }
 
   const salvar = useMutation({
@@ -158,17 +160,14 @@ export function CommunitiesPage() {
   }
 
   function exportarPdf() {
-    const linhas = (data ?? []).map((c) => {
-      const s = resumoCelebracoes(c.id)
-      return {
-        nome: c.nome,
-        padroeiro: c.nomePadroeiro || '—',
-        representante: c.coordenadorNome || '—',
-        whatsapp: c.coordenadorWhatsapp || '—',
-        celebracoes: s.total === 0 ? '—' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`,
-        situacao: c.ativo ? 'Ativa' : 'Inativa',
-      }
-    })
+    const linhas = (data ?? []).map((c) => ({
+      nome: c.nome,
+      padroeiro: c.nomePadroeiro || '—',
+      representante: c.coordenadorNome || '—',
+      whatsapp: c.coordenadorWhatsapp || '—',
+      celebracoes: diasPadrao(c.id) || '—',
+      situacao: c.ativo ? 'Ativa' : 'Inativa',
+    }))
     baixarPdfDoc(
       <ListaPDF
         titulo="Comunidades"
@@ -232,7 +231,7 @@ export function CommunitiesPage() {
             </Table.Thead>
             <Table.Tbody>
               {data.map((c) => {
-                const s = resumoCelebracoes(c.id)
+                const dias = diasPadrao(c.id)
                 return (
                   <Table.Tr
                     key={c.id}
@@ -243,9 +242,7 @@ export function CommunitiesPage() {
                     <Table.Td><Text fw={500}>{c.nome}</Text></Table.Td>
                     <Table.Td>{c.nomePadroeiro || '—'}</Table.Td>
                     <Table.Td>
-                      <Badge color={s.total === 0 ? 'orange' : 'gray'} variant="light">
-                        {s.total === 0 ? 'Definir' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}
-                      </Badge>
+                      <Badge color={dias ? 'gray' : 'orange'} variant="light">{dias || 'Definir'}</Badge>
                     </Table.Td>
                     <Table.Td>
                       <Badge color={c.ativo ? 'teal' : 'gray'} variant="light">{c.ativo ? 'Ativa' : 'Inativa'}</Badge>
@@ -321,7 +318,7 @@ export function CommunitiesPage() {
       <Modal opened={detalhe !== null} onClose={() => setDetalheId(null)} title={detalhe?.nome ?? ''} size="md">
         {detalhe &&
           (() => {
-            const s = resumoCelebracoes(detalhe.id)
+            const dias = diasPadrao(detalhe.id)
             return (
               <Stack gap="sm">
                 <Stack gap={6}>
@@ -329,7 +326,7 @@ export function CommunitiesPage() {
                   <Group justify="space-between" wrap="nowrap"><Text size="sm" c="dimmed">Endereço</Text><Text size="sm" fw={500} ta="right">{detalhe.endereco || '—'}</Text></Group>
                   <Group justify="space-between"><Text size="sm" c="dimmed">Representante</Text><Text size="sm" fw={500}>{detalhe.coordenadorNome || '—'}</Text></Group>
                   <Group justify="space-between"><Text size="sm" c="dimmed">WhatsApp</Text><Text size="sm" fw={500}>{detalhe.coordenadorWhatsapp || '—'}</Text></Group>
-                  <Group justify="space-between"><Text size="sm" c="dimmed">Celebrações</Text><Text size="sm" fw={500}>{s.total === 0 ? 'nenhuma' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}</Text></Group>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">Celebrações</Text><Text size="sm" fw={500}>{dias || '—'}</Text></Group>
                   <Group justify="space-between"><Text size="sm" c="dimmed">Situação</Text><Badge color={detalhe.ativo ? 'teal' : 'gray'} variant="light">{detalhe.ativo ? 'Ativa' : 'Inativa'}</Badge></Group>
                 </Stack>
                 <Divider />

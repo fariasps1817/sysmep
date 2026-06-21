@@ -22,6 +22,8 @@ export const DIAS_SEMANA = [
 
 export const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+export const DIAS_PLURAL = ['Domingos', 'Segundas', 'Terças', 'Quartas', 'Quintas', 'Sextas', 'Sábados']
+
 export const OPCOES_DIA = DIAS_SEMANA.map((label, value) => ({ value: String(value), label }))
 
 export const OPCOES_NTH = [
