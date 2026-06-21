@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import {
-  ActionIcon,
   Alert,
+  Badge,
   Button,
   Center,
+  Divider,
   Group,
   Loader,
   Modal,
@@ -13,7 +14,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -29,6 +29,7 @@ import {
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro } from '../lib/types'
+import { formatarBR } from '../lib/datas'
 import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '../lib/texto'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
@@ -58,6 +59,7 @@ export function MinistersPage() {
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Ministro | null>(null)
   const [dispDe, setDispDe] = useState<Ministro | null>(null)
+  const [detalheId, setDetalheId] = useState<number | null>(null)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -155,6 +157,8 @@ export function MinistersPage() {
     })
   }
 
+  const detalhe = (data ?? []).find((m) => m.id === detalheId) ?? null
+
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
@@ -177,7 +181,8 @@ export function MinistersPage() {
       {isLoading ? (
         <Center py="xl"><Loader /></Center>
       ) : data && data.length > 0 ? (
-        <Table.ScrollContainer minWidth={680}>
+        <>
+        <Table.ScrollContainer minWidth={460}>
           <Table striped highlightOnHover verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
@@ -185,50 +190,33 @@ export function MinistersPage() {
                 <Table.Th>WhatsApp</Table.Th>
                 <Table.Th>Disponib.</Table.Th>
                 <Table.Th>Ativo</Table.Th>
-                <Table.Th ta="right">Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {data.map((m) => (
-                <Table.Tr key={m.id} opacity={m.ativo ? 1 : 0.55}>
-                  <Table.Td>
-                    <Text fw={500}>{m.nomeCompleto}</Text>
-                    {m.tratamento && <Text size="xs" c="dimmed">{m.tratamento}</Text>}
-                  </Table.Td>
+                <Table.Tr
+                  key={m.id}
+                  opacity={m.ativo ? 1 : 0.55}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setDetalheId(m.id)}
+                >
+                  <Table.Td><Text fw={500}>{m.nomeCompleto}</Text></Table.Td>
                   <Table.Td>{m.whatsapp || '—'}</Table.Td>
                   <Table.Td>
-                    <Button
-                      variant="light"
-                      color={qtdRestricoes(m.id) ? 'orange' : 'gray'}
-                      size="compact-sm"
-                      leftSection={<IconCalendarOff size={14} />}
-                      onClick={() => setDispDe(m)}
-                    >
+                    <Badge color={qtdRestricoes(m.id) ? 'orange' : 'gray'} variant="light">
                       {qtdRestricoes(m.id) ? `${qtdRestricoes(m.id)} restr.` : 'Sempre'}
-                    </Button>
+                    </Badge>
                   </Table.Td>
                   <Table.Td>
-                    <Switch
-                      checked={m.ativo}
-                      onChange={() => alternarAtivo.mutate(m)}
-                      aria-label="Ativo para a escala"
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" justify="flex-end" wrap="nowrap">
-                      <Tooltip label="Editar">
-                        <ActionIcon variant="subtle" onClick={() => abrirEdicao(m)}><IconPencil size={18} /></ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Remover">
-                        <ActionIcon variant="subtle" color="red" onClick={() => confirmarExclusao(m)}><IconTrash size={18} /></ActionIcon>
-                      </Tooltip>
-                    </Group>
+                    <Badge color={m.ativo ? 'teal' : 'gray'} variant="light">{m.ativo ? 'Ativo' : 'Inativo'}</Badge>
                   </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
+        <Text size="xs" c="dimmed" mt={6}>Toque em um ministro para ver detalhes e ações.</Text>
+        </>
       ) : (
         !isError && (
           <Center py="xl">
@@ -290,6 +278,33 @@ export function MinistersPage() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      <Modal opened={detalhe !== null} onClose={() => setDetalheId(null)} title={detalhe?.nomeCompleto ?? ''} size="md">
+        {detalhe && (
+          <Stack gap="sm">
+            <Stack gap={6}>
+              <Group justify="space-between"><Text size="sm" c="dimmed">WhatsApp</Text><Text size="sm" fw={500}>{detalhe.whatsapp || '—'}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Bairro</Text><Text size="sm" fw={500}>{detalhe.bairro || '—'}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Nascimento</Text><Text size="sm" fw={500}>{formatarBR(detalhe.dataNascimento)}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Ordenado(a) desde</Text><Text size="sm" fw={500}>{formatarBR(detalhe.ordenadoEm)}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Ministro da Eucaristia</Text><Text size="sm" fw={500}>{detalhe.ministroEucaristia ? 'Sim' : 'Não'}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Restrições</Text><Text size="sm" fw={500}>{qtdRestricoes(detalhe.id) ? `${qtdRestricoes(detalhe.id)} restrição(ões)` : 'nenhuma'}</Text></Group>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Situação</Text><Badge color={detalhe.ativo ? 'teal' : 'gray'} variant="light">{detalhe.ativo ? 'Ativo' : 'Inativo'}</Badge></Group>
+            </Stack>
+            <Divider />
+            <Group grow>
+              <Button variant="light" leftSection={<IconPencil size={16} />} onClick={() => { const m = detalhe; setDetalheId(null); abrirEdicao(m) }}>Editar</Button>
+              <Button variant="light" color="orange" leftSection={<IconCalendarOff size={16} />} onClick={() => { const m = detalhe; setDetalheId(null); setDispDe(m) }}>Disponibilidade</Button>
+            </Group>
+            <Group grow>
+              <Button variant="light" color={detalhe.ativo ? 'gray' : 'teal'} onClick={() => alternarAtivo.mutate(detalhe)}>
+                {detalhe.ativo ? 'Desativar' : 'Ativar'}
+              </Button>
+              <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => confirmarExclusao(detalhe)}>Excluir</Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
 
       <MinisterAvailabilityDrawer
