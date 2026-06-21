@@ -1,5 +1,5 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and, desc } from 'drizzle-orm'
 import { db } from '../../db/client'
 import {
   ministers,
@@ -7,6 +7,8 @@ import {
   parishSettings,
   celebrationRules,
   ministerUnavailability,
+  schedules,
+  assignments,
 } from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
 import { lerSessao } from './_lib/auth'
@@ -32,6 +34,8 @@ export const handler: Handler = async (event) => {
         return await rulesHandler(event, metodo, id)
       case 'availability':
         return await availabilityHandler(event, metodo, id)
+      case 'schedules':
+        return await schedulesHandler(event, metodo, id, sessao.id)
       default:
         return erro(404, `Recurso "${recurso ?? ''}" não encontrado.`)
     }
@@ -239,6 +243,82 @@ function montarIndisp(b: Record<string, unknown>, parcial = false) {
   }
   if (parcial) Object.keys(dados).forEach((k) => dados[k] === undefined && delete dados[k])
   return dados
+}
+
+// ---------- Escalas + atribuições ----------
+async function schedulesHandler(event: HandlerEvent, metodo: string, id: number | undefined, operadorId: number) {
+  if (metodo === 'GET' && id) {
+    const [sch] = await db.select().from(schedules).where(eq(schedules.id, id)).limit(1)
+    if (!sch) return erro(404, 'Escala não encontrada.')
+    const itens = await db.select().from(assignments).where(eq(assignments.scheduleId, id)).orderBy(asc(assignments.data), asc(assignments.horario))
+    return json(200, { schedule: sch, assignments: itens })
+  }
+
+  if (metodo === 'GET' && !id) {
+    const mes = num(event.queryStringParameters?.mes)
+    const ano = num(event.queryStringParameters?.ano)
+    if (mes && ano) {
+      const [sch] = await db.select().from(schedules).where(and(eq(schedules.mes, mes), eq(schedules.ano, ano))).limit(1)
+      if (!sch) return json(200, null)
+      const itens = await db.select().from(assignments).where(eq(assignments.scheduleId, sch.id)).orderBy(asc(assignments.data), asc(assignments.horario))
+      return json(200, { schedule: sch, assignments: itens })
+    }
+    const lista = await db.select().from(schedules).orderBy(desc(schedules.ano), desc(schedules.mes))
+    return json(200, lista)
+  }
+
+  if (metodo === 'POST') {
+    const b = lerCorpo<{ mes?: unknown; ano?: unknown; status?: unknown; assignments?: unknown }>(event)
+    const mes = num(b.mes)
+    const ano = num(b.ano)
+    if (!mes || !ano) return erro(400, 'Informe mês e ano.')
+    const status = b.status === 'publicada' ? 'publicada' : 'rascunho'
+    const lista = Array.isArray(b.assignments) ? (b.assignments as Record<string, unknown>[]) : []
+
+    const [existente] = await db.select().from(schedules).where(and(eq(schedules.mes, mes), eq(schedules.ano, ano))).limit(1)
+    let scheduleId: number
+    if (existente) {
+      scheduleId = existente.id
+      await db.update(schedules).set({ status }).where(eq(schedules.id, scheduleId))
+      await db.delete(assignments).where(eq(assignments.scheduleId, scheduleId))
+    } else {
+      const [novo] = await db.insert(schedules).values({ mes, ano, status, criadoPor: operadorId }).returning()
+      scheduleId = novo.id
+    }
+
+    const rows = lista
+      .map((a) => ({
+        scheduleId,
+        data: str(a.data),
+        horario: str(a.horario) ?? '',
+        communityId: num(a.communityId),
+        ministerId: num(a.ministerId) ?? null,
+        locked: bool(a.locked, false) ?? false,
+        motivo: str(a.motivo) ?? null,
+      }))
+      .filter((r) => r.data && r.communityId) as (typeof assignments.$inferInsert)[]
+
+    if (rows.length) await db.insert(assignments).values(rows)
+
+    const [sch] = await db.select().from(schedules).where(eq(schedules.id, scheduleId)).limit(1)
+    const salvos = await db.select().from(assignments).where(eq(assignments.scheduleId, scheduleId)).orderBy(asc(assignments.data), asc(assignments.horario))
+    return json(200, { schedule: sch, assignments: salvos })
+  }
+
+  if (metodo === 'PATCH' && id) {
+    const b = lerCorpo<{ status?: unknown }>(event)
+    const status = b.status === 'publicada' ? 'publicada' : 'rascunho'
+    const [sch] = await db.update(schedules).set({ status }).where(eq(schedules.id, id)).returning()
+    if (!sch) return erro(404, 'Escala não encontrada.')
+    return json(200, sch)
+  }
+
+  if (metodo === 'DELETE' && id) {
+    await db.delete(schedules).where(eq(schedules.id, id))
+    return json(200, { ok: true })
+  }
+
+  return erro(405, 'Método não permitido.')
 }
 
 // ---------- utilitários ----------
