@@ -13,11 +13,9 @@ import {
   Table,
   Text,
   TextInput,
-  Textarea,
   Title,
   Tooltip,
 } from '@mantine/core'
-import { DateInput } from '@mantine/dates'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
@@ -32,32 +30,29 @@ import {
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro } from '../lib/types'
-import { paraISO, deISO, formatarBR } from '../lib/datas'
+import { formatarBR } from '../lib/datas'
+import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '../lib/texto'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
 
 type FormValores = {
   nomeCompleto: string
-  tratamento: string
-  dataNascimento: Date | null
+  dataNascimento: string
   whatsapp: string
   bairro: string
-  ordenadoEm: Date | null
+  ordenadoEm: string
   ministroEucaristia: boolean
   ativo: boolean
-  observacoes: string
 }
 
 const valoresIniciais: FormValores = {
   nomeCompleto: '',
-  tratamento: '',
-  dataNascimento: null,
+  dataNascimento: '',
   whatsapp: '',
   bairro: '',
-  ordenadoEm: null,
+  ordenadoEm: '',
   ministroEucaristia: false,
   ativo: true,
-  observacoes: '',
 }
 
 export function MinistersPage() {
@@ -68,7 +63,11 @@ export function MinistersPage() {
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
-    validate: { nomeCompleto: (v) => (v.trim() ? null : 'Informe o nome') },
+    validate: {
+      nomeCompleto: (v) => (v.trim() ? null : 'Informe o nome'),
+      dataNascimento: (v) => (!v || brParaISO(v) ? null : 'Data inválida (DD/MM/AAAA)'),
+      ordenadoEm: (v) => (!v || brParaISO(v) ? null : 'Data inválida (DD/MM/AAAA)'),
+    },
   })
 
   const { data, isLoading, isError, error } = useQuery({
@@ -88,15 +87,13 @@ export function MinistersPage() {
   const salvar = useMutation({
     mutationFn: (valores: FormValores) => {
       const payload = {
-        nomeCompleto: valores.nomeCompleto,
-        tratamento: valores.tratamento,
-        dataNascimento: paraISO(valores.dataNascimento),
+        nomeCompleto: tituloCaso(valores.nomeCompleto),
+        dataNascimento: brParaISO(valores.dataNascimento),
         whatsapp: valores.whatsapp,
         bairro: valores.bairro,
-        ordenadoEm: paraISO(valores.ordenadoEm),
+        ordenadoEm: brParaISO(valores.ordenadoEm),
         ministroEucaristia: valores.ministroEucaristia,
         ativo: valores.ativo,
-        observacoes: valores.observacoes,
       }
       return editando
         ? api.put(`/api/ministers/${editando.id}`, payload)
@@ -135,14 +132,12 @@ export function MinistersPage() {
     setEditando(m)
     form.setValues({
       nomeCompleto: m.nomeCompleto,
-      tratamento: m.tratamento ?? '',
-      dataNascimento: deISO(m.dataNascimento),
-      whatsapp: m.whatsapp ?? '',
+      dataNascimento: isoParaBR(m.dataNascimento),
+      whatsapp: mascaraTelefone(m.whatsapp ?? ''),
       bairro: m.bairro ?? '',
-      ordenadoEm: deISO(m.ordenadoEm),
+      ordenadoEm: isoParaBR(m.ordenadoEm),
       ministroEucaristia: m.ministroEucaristia,
       ativo: m.ativo,
-      observacoes: m.observacoes ?? '',
     })
     setAberto(true)
   }
@@ -257,23 +252,46 @@ export function MinistersPage() {
       <Modal opened={aberto} onClose={fechar} title={editando ? 'Editar ministro' : 'Novo ministro'} size="lg">
         <form onSubmit={form.onSubmit((v) => salvar.mutate(v))}>
           <Stack>
-            <TextInput label="Nome completo" withAsterisk {...form.getInputProps('nomeCompleto')} />
+            <TextInput
+              label="Nome completo"
+              withAsterisk
+              value={form.values.nomeCompleto}
+              onChange={(e) => form.setFieldValue('nomeCompleto', e.currentTarget.value)}
+              onBlur={(e) => form.setFieldValue('nomeCompleto', tituloCaso(e.currentTarget.value))}
+              error={form.errors.nomeCompleto}
+            />
             <Group grow>
-              <TextInput label="Tratamento" placeholder="Ministro(a), Sr., Sra." {...form.getInputProps('tratamento')} />
-              <TextInput label="WhatsApp" placeholder="(85) 90000-0000" {...form.getInputProps('whatsapp')} />
-            </Group>
-            <Group grow>
+              <TextInput
+                label="WhatsApp"
+                placeholder="(85) 90000-0000"
+                inputMode="tel"
+                value={form.values.whatsapp}
+                onChange={(e) => form.setFieldValue('whatsapp', mascaraTelefone(e.currentTarget.value))}
+              />
               <TextInput label="Bairro" {...form.getInputProps('bairro')} />
-              <DateInput label="Data de nascimento" valueFormat="DD/MM/YYYY" clearable {...form.getInputProps('dataNascimento')} />
             </Group>
             <Group grow>
-              <DateInput label="Ordenado(a) no ministério desde" valueFormat="DD/MM/YYYY" clearable {...form.getInputProps('ordenadoEm')} />
+              <TextInput
+                label="Data de nascimento"
+                placeholder="DD/MM/AAAA"
+                inputMode="numeric"
+                value={form.values.dataNascimento}
+                onChange={(e) => form.setFieldValue('dataNascimento', mascaraData(e.currentTarget.value))}
+                error={form.errors.dataNascimento}
+              />
+              <TextInput
+                label="Ordenado(a) no ministério desde"
+                placeholder="DD/MM/AAAA"
+                inputMode="numeric"
+                value={form.values.ordenadoEm}
+                onChange={(e) => form.setFieldValue('ordenadoEm', mascaraData(e.currentTarget.value))}
+                error={form.errors.ordenadoEm}
+              />
             </Group>
             <Group>
               <Switch label="Também Ministro da Eucaristia (MESC)" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
               <Switch label="Ativo para a escala" {...form.getInputProps('ativo', { type: 'checkbox' })} />
             </Group>
-            <Textarea label="Observações" autosize minRows={2} {...form.getInputProps('observacoes')} />
             <Group justify="flex-end" mt="sm">
               <Button variant="default" onClick={fechar}>Cancelar</Button>
               <Button type="submit" loading={salvar.isPending}>Salvar</Button>

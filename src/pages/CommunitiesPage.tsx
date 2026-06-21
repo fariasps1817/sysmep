@@ -30,6 +30,7 @@ import {
 import { api } from '../lib/api'
 import type { Comunidade } from '../lib/types'
 import type { Regra } from '../lib/celebracao'
+import { tituloCaso, mascaraTelefone } from '../lib/texto'
 import { CelebrationRulesDrawer } from '../components/CelebrationRulesDrawer'
 
 type FormValores = {
@@ -79,10 +80,18 @@ export function CommunitiesPage() {
   }
 
   const salvar = useMutation({
-    mutationFn: (valores: FormValores) =>
-      editando
-        ? api.put(`/api/communities/${editando.id}`, valores)
-        : api.post('/api/communities', valores),
+    mutationFn: (valores: FormValores) => {
+      const payload = {
+        ...valores,
+        nome: tituloCaso(valores.nome),
+        nomePadroeiro: tituloCaso(valores.nomePadroeiro),
+        endereco: tituloCaso(valores.endereco),
+        coordenadorNome: tituloCaso(valores.coordenadorNome),
+      }
+      return editando
+        ? api.put(`/api/communities/${editando.id}`, payload)
+        : api.post('/api/communities', payload)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comunidades'] })
       notifications.show({ color: 'teal', message: editando ? 'Comunidade atualizada.' : 'Comunidade cadastrada.' })
@@ -113,7 +122,7 @@ export function CommunitiesPage() {
       nomePadroeiro: c.nomePadroeiro ?? '',
       endereco: c.endereco ?? '',
       coordenadorNome: c.coordenadorNome ?? '',
-      coordenadorWhatsapp: c.coordenadorWhatsapp ?? '',
+      coordenadorWhatsapp: mascaraTelefone(c.coordenadorWhatsapp ?? ''),
       ativo: c.ativo,
     })
     setAberto(true)
@@ -218,12 +227,41 @@ export function CommunitiesPage() {
       <Modal opened={aberto} onClose={fechar} title={editando ? 'Editar comunidade' : 'Nova comunidade'} size="lg">
         <form onSubmit={form.onSubmit((v) => salvar.mutate(v))}>
           <Stack>
-            <TextInput label="Nome (bairro ou apelido)" withAsterisk {...form.getInputProps('nome')} />
-            <TextInput label="Padroeiro(a)" placeholder="Ex.: Santo Expedito" {...form.getInputProps('nomePadroeiro')} />
-            <TextInput label="Endereço da capela" {...form.getInputProps('endereco')} />
+            <TextInput
+              label="Nome (bairro ou apelido)"
+              withAsterisk
+              value={form.values.nome}
+              onChange={(e) => form.setFieldValue('nome', e.currentTarget.value)}
+              onBlur={(e) => form.setFieldValue('nome', tituloCaso(e.currentTarget.value))}
+              error={form.errors.nome}
+            />
+            <TextInput
+              label="Padroeiro(a)"
+              placeholder="Ex.: Santo Expedito"
+              value={form.values.nomePadroeiro}
+              onChange={(e) => form.setFieldValue('nomePadroeiro', e.currentTarget.value)}
+              onBlur={(e) => form.setFieldValue('nomePadroeiro', tituloCaso(e.currentTarget.value))}
+            />
+            <TextInput
+              label="Endereço da capela"
+              value={form.values.endereco}
+              onChange={(e) => form.setFieldValue('endereco', e.currentTarget.value)}
+              onBlur={(e) => form.setFieldValue('endereco', tituloCaso(e.currentTarget.value))}
+            />
             <Group grow>
-              <TextInput label="Representante / coordenador" {...form.getInputProps('coordenadorNome')} />
-              <TextInput label="WhatsApp do representante" placeholder="(85) 90000-0000" {...form.getInputProps('coordenadorWhatsapp')} />
+              <TextInput
+                label="Representante / coordenador"
+                value={form.values.coordenadorNome}
+                onChange={(e) => form.setFieldValue('coordenadorNome', e.currentTarget.value)}
+                onBlur={(e) => form.setFieldValue('coordenadorNome', tituloCaso(e.currentTarget.value))}
+              />
+              <TextInput
+                label="WhatsApp do representante"
+                placeholder="(85) 90000-0000"
+                inputMode="tel"
+                value={form.values.coordenadorWhatsapp}
+                onChange={(e) => form.setFieldValue('coordenadorWhatsapp', mascaraTelefone(e.currentTarget.value))}
+              />
             </Group>
             <Switch label="Comunidade ativa" {...form.getInputProps('ativo', { type: 'checkbox' })} />
             <Group justify="flex-end" mt="sm">
