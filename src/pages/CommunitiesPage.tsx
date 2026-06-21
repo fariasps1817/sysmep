@@ -19,9 +19,18 @@ import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconPlus, IconPencil, IconTrash, IconAlertCircle, IconBuildingChurch } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconPencil,
+  IconTrash,
+  IconAlertCircle,
+  IconBuildingChurch,
+  IconCalendarEvent,
+} from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Comunidade } from '../lib/types'
+import type { Regra } from '../lib/celebracao'
+import { CelebrationRulesDrawer } from '../components/CelebrationRulesDrawer'
 
 type FormValores = {
   nome: string
@@ -45,6 +54,7 @@ export function CommunitiesPage() {
   const qc = useQueryClient()
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Comunidade | null>(null)
+  const [celebracoesDe, setCelebracoesDe] = useState<Comunidade | null>(null)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -55,6 +65,18 @@ export function CommunitiesPage() {
     queryKey: ['comunidades'],
     queryFn: () => api.get<Comunidade[]>('/api/communities'),
   })
+
+  const { data: regras } = useQuery({
+    queryKey: ['rules-todas'],
+    queryFn: () => api.get<Regra[]>('/api/rules'),
+  })
+
+  function resumoCelebracoes(comunidadeId: number) {
+    const lista = (regras ?? []).filter((r) => r.communityId === comunidadeId)
+    const palavra = lista.filter((r) => r.tipo === 'palavra').length
+    const missa = lista.filter((r) => r.tipo === 'missa').length
+    return { total: lista.length, palavra, missa }
+  }
 
   const salvar = useMutation({
     mutationFn: (valores: FormValores) =>
@@ -137,8 +159,8 @@ export function CommunitiesPage() {
               <Table.Tr>
                 <Table.Th>Nome</Table.Th>
                 <Table.Th>Padroeiro</Table.Th>
+                <Table.Th>Celebrações</Table.Th>
                 <Table.Th>Representante</Table.Th>
-                <Table.Th>WhatsApp</Table.Th>
                 <Table.Th>Ativa</Table.Th>
                 <Table.Th ta="right">Ações</Table.Th>
               </Table.Tr>
@@ -148,8 +170,23 @@ export function CommunitiesPage() {
                 <Table.Tr key={c.id} opacity={c.ativo ? 1 : 0.55}>
                   <Table.Td><Text fw={500}>{c.nome}</Text></Table.Td>
                   <Table.Td>{c.nomePadroeiro || '—'}</Table.Td>
+                  <Table.Td>
+                    {(() => {
+                      const s = resumoCelebracoes(c.id)
+                      return (
+                        <Button
+                          variant="light"
+                          color={s.total === 0 ? 'orange' : 'gray'}
+                          size="compact-sm"
+                          leftSection={<IconCalendarEvent size={14} />}
+                          onClick={() => setCelebracoesDe(c)}
+                        >
+                          {s.total === 0 ? 'Definir' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}
+                        </Button>
+                      )
+                    })()}
+                  </Table.Td>
                   <Table.Td>{c.coordenadorNome || '—'}</Table.Td>
-                  <Table.Td>{c.coordenadorWhatsapp || '—'}</Table.Td>
                   <Table.Td>{c.ativo ? 'Sim' : 'Não'}</Table.Td>
                   <Table.Td>
                     <Group gap="xs" justify="flex-end" wrap="nowrap">
@@ -196,6 +233,8 @@ export function CommunitiesPage() {
           </Stack>
         </form>
       </Modal>
+
+      <CelebrationRulesDrawer comunidade={celebracoesDe} onClose={() => setCelebracoesDe(null)} />
     </Stack>
   )
 }

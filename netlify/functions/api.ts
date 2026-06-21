@@ -1,7 +1,7 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { eq } from 'drizzle-orm'
+import { eq, asc } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { ministers, communities, parishSettings } from '../../db/schema'
+import { ministers, communities, parishSettings, celebrationRules } from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
 import { lerSessao } from './_lib/auth'
 
@@ -22,6 +22,8 @@ export const handler: Handler = async (event) => {
         return await ministersHandler(event, metodo, id)
       case 'communities':
         return await communitiesHandler(event, metodo, id)
+      case 'rules':
+        return await rulesHandler(event, metodo, id)
       default:
         return erro(404, `Recurso "${recurso ?? ''}" não encontrado.`)
     }
@@ -139,7 +141,59 @@ function montarComunidade(b: Record<string, unknown>, parcial = false) {
   return dados
 }
 
+// ---------- Regras de celebração ----------
+async function rulesHandler(event: HandlerEvent, metodo: string, id?: number) {
+  if (metodo === 'GET' && !id) {
+    const communityId = num(event.queryStringParameters?.communityId)
+    const base = db.select().from(celebrationRules)
+    const rows = communityId
+      ? await base.where(eq(celebrationRules.communityId, communityId)).orderBy(asc(celebrationRules.weekday), asc(celebrationRules.horario))
+      : await base.orderBy(asc(celebrationRules.communityId), asc(celebrationRules.weekday))
+    return json(200, rows)
+  }
+  if (metodo === 'POST') {
+    const dados = montarRegra(lerCorpo(event))
+    if (!dados.communityId) return erro(400, 'Informe a comunidade.')
+    if (dados.weekday === undefined) return erro(400, 'Informe o dia da semana.')
+    if (!dados.horario) return erro(400, 'Informe o horário.')
+    const row = await db.insert(celebrationRules).values(dados as typeof celebrationRules.$inferInsert).returning()
+    return json(201, row[0])
+  }
+  if ((metodo === 'PUT' || metodo === 'PATCH') && id) {
+    const dados = montarRegra(lerCorpo(event), true) as Partial<typeof celebrationRules.$inferInsert>
+    const row = await db.update(celebrationRules).set(dados).where(eq(celebrationRules.id, id)).returning()
+    if (!row.length) return erro(404, 'Regra não encontrada.')
+    return json(200, row[0])
+  }
+  if (metodo === 'DELETE' && id) {
+    await db.delete(celebrationRules).where(eq(celebrationRules.id, id))
+    return json(200, { ok: true })
+  }
+  return erro(405, 'Método não permitido.')
+}
+
+function montarRegra(b: Record<string, unknown>, parcial = false) {
+  const freq = str(b.frequencia) === 'monthly_nth' ? 'monthly_nth' : 'weekly'
+  const dados: Record<string, unknown> = {
+    communityId: num(b.communityId),
+    weekday: num(b.weekday),
+    horario: str(b.horario),
+    frequencia: freq,
+    nth: freq === 'monthly_nth' ? num(b.nth) ?? null : null,
+    tipo: str(b.tipo) === 'missa' ? 'missa' : 'palavra',
+    ativo: bool(b.ativo, true),
+    rotulo: str(b.rotulo),
+  }
+  if (parcial) Object.keys(dados).forEach((k) => dados[k] === undefined && delete dados[k])
+  return dados
+}
+
 // ---------- utilitários ----------
+function num(v: unknown): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
 function str(v: unknown): string | undefined {
   if (v === undefined || v === null) return undefined
   const s = String(v).trim()
