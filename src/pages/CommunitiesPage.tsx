@@ -296,13 +296,13 @@ export function CommunitiesPage() {
             />
             <Group grow>
               <TextInput
-                label="Representante / coordenador"
+                label="Representante"
                 value={form.values.coordenadorNome}
                 onChange={(e) => form.setFieldValue('coordenadorNome', e.currentTarget.value)}
                 onBlur={(e) => form.setFieldValue('coordenadorNome', tituloCaso(e.currentTarget.value))}
               />
               <TextInput
-                label="WhatsApp do representante"
+                label="WhatsApp"
                 placeholder="(85) 90000-0000"
                 inputMode="tel"
                 value={form.values.coordenadorWhatsapp}
