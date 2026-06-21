@@ -27,7 +27,7 @@ export function mensagemMinistro(
   return (
     `${saudacao(tratamento, nome)}, segue sua escala de envio de *${mesAnoLabel}*:\n\n` +
     `${linhas}\n\n` +
-    `Contamos com seu sim. Paz e bem! 🙏`
+    `Contamos com seu sim. Paz! 🙏`
   )
 }
 
@@ -46,7 +46,7 @@ export function mensagemRepresentante(
     )
     .join('\n')
   return (
-    `Paz e bem! Escala das Celebrações da Palavra da comunidade *${comunidadeNome}* para *${mesAnoLabel}*:\n\n` +
+    `Paz! Escala das Celebrações da Palavra da comunidade *${comunidadeNome}* para *${mesAnoLabel}*:\n\n` +
     `${linhas}\n\n` +
     `Deus abençoe! 🙏`
   )
