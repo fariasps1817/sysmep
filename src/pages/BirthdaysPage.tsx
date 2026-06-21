@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  ActionIcon,
   Button,
   Card,
   Center,
@@ -11,6 +12,7 @@ import {
   Text,
   ThemeIcon,
   Title,
+  Tooltip,
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { IconCake, IconBrandWhatsapp, IconFileTypePdf } from '@tabler/icons-react'
@@ -93,14 +95,11 @@ export function BirthdaysPage() {
         </div>
         <Group align="flex-end" gap="sm">
           <Select label="Mês" w={150} data={opcoesMes} value={String(mes)} onChange={(v) => v && setMes(Number(v))} allowDeselect={false} />
-          <Button
-            variant="default"
-            leftSection={<IconFileTypePdf size={18} />}
-            disabled={aniversariantes.length === 0}
-            onClick={exportarPdf}
-          >
-            Exportar PDF
-          </Button>
+          <Tooltip label="Exportar PDF">
+            <ActionIcon variant="subtle" color="gray" size="lg" disabled={aniversariantes.length === 0} onClick={exportarPdf} aria-label="Exportar PDF">
+              <IconFileTypePdf size={20} />
+            </ActionIcon>
+          </Tooltip>
           <Button
             color="green"
             leftSection={<IconBrandWhatsapp size={18} />}

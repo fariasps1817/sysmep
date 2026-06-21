@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -14,6 +15,7 @@ import {
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -203,9 +205,11 @@ export function MinistersPage() {
           </Text>
         </div>
         <Group gap="xs">
-          <Button variant="default" leftSection={<IconFileTypePdf size={18} />} onClick={exportarPdf} disabled={!data?.length}>
-            Exportar PDF
-          </Button>
+          <Tooltip label="Exportar PDF">
+            <ActionIcon variant="subtle" color="gray" size="lg" onClick={exportarPdf} disabled={!data?.length} aria-label="Exportar PDF">
+              <IconFileTypePdf size={20} />
+            </ActionIcon>
+          </Tooltip>
           <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Novo ministro</Button>
         </Group>
       </Group>
