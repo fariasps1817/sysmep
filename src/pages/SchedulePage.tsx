@@ -16,6 +16,7 @@ import {
   ActionIcon,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
+import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   IconSparkles,
@@ -26,6 +27,7 @@ import {
   IconAlertTriangle,
   IconBrandWhatsapp,
   IconFileTypePdf,
+  IconTrash,
 } from '@tabler/icons-react'
 import { pdf } from '@react-pdf/renderer'
 import { api } from '../lib/api'
@@ -72,6 +74,7 @@ export function SchedulePage() {
   const [linhas, setLinhas] = useState<Record<string, LinhaInfo>>({})
   const [gerado, setGerado] = useState(false)
   const [status, setStatus] = useState<'rascunho' | 'publicada' | null>(null)
+  const [scheduleId, setScheduleId] = useState<number | null>(null)
   const [modalEnvio, setModalEnvio] = useState<{ titulo: string; descricao: string; mensagens: MensagemEnvio[] } | null>(null)
 
   const { data: comunidades } = useQuery({ queryKey: ['comunidades'], queryFn: () => api.get<Comunidade[]>('/api/communities') })
@@ -106,7 +109,7 @@ export function SchedulePage() {
 
   // Carrega escala existente do mês (se houver).
   type EscalaSalva = {
-    schedule: { status: string }
+    schedule: { id: number; status: string }
     assignments: Array<{ communityId: number; data: string; ministerId: number | null; locked: boolean; motivo: string | null }>
   } | null
   const escalaQuery = useQuery({
@@ -125,12 +128,44 @@ export function SchedulePage() {
       setLinhas(novo)
       setGerado(true)
       setStatus(r.schedule.status === 'publicada' ? 'publicada' : 'rascunho')
+      setScheduleId(r.schedule.id)
     } else {
       setLinhas({})
       setGerado(false)
       setStatus(null)
+      setScheduleId(null)
     }
   }, [escalaQuery.data])
+
+  // Lista de escalas salvas (para gerenciar/excluir)
+  const { data: listaEscalas } = useQuery({
+    queryKey: ['escalas-lista'],
+    queryFn: () => api.get<{ id: number; mes: number; ano: number; status: string }[]>('/api/schedules'),
+  })
+
+  const excluirEscala = useMutation({
+    mutationFn: (id: number) => api.del(`/api/schedules/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['escalas-lista'] })
+      qc.invalidateQueries({ queryKey: ['escala', mes, ano] })
+      setLinhas({})
+      setGerado(false)
+      setStatus(null)
+      setScheduleId(null)
+      notifications.show({ color: 'teal', message: 'Escala excluída.' })
+    },
+    onError: (e: Error) => notifications.show({ color: 'red', title: 'Erro ao excluir', message: e.message }),
+  })
+
+  function confirmarExclusaoEscala(id: number, rotulo: string) {
+    modals.openConfirmModal({
+      title: 'Excluir escala',
+      children: <Text size="sm">Excluir a escala de <b>{rotulo}</b>? Esta ação não pode ser desfeita.</Text>,
+      labels: { confirm: 'Excluir', cancel: 'Cancelar' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => excluirEscala.mutate(id),
+    })
+  }
 
   function gerar() {
     const travados: Record<string, number | null> = {}
@@ -186,6 +221,7 @@ export function SchedulePage() {
     },
     onSuccess: (_d, novoStatus) => {
       qc.invalidateQueries({ queryKey: ['escala', mes, ano] })
+      qc.invalidateQueries({ queryKey: ['escalas-lista'] })
       setStatus(novoStatus)
       notifications.show({ color: 'teal', message: novoStatus === 'publicada' ? 'Escala publicada!' : 'Rascunho salvo.' })
     },
@@ -331,6 +367,34 @@ export function SchedulePage() {
         </Group>
       </Group>
 
+      {listaEscalas && listaEscalas.length > 0 && (
+        <Card withBorder radius="md" padding="sm">
+          <Text size="sm" fw={600} mb="xs">Escalas salvas</Text>
+          <Group gap="xs">
+            {listaEscalas.map((e) => (
+              <Group
+                key={e.id}
+                gap={4}
+                wrap="nowrap"
+                style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8, paddingLeft: 8 }}
+              >
+                <Button variant="subtle" size="compact-sm" color="gray" onClick={() => { setMes(e.mes); setAno(e.ano) }}>
+                  {rotuloMesAno(e.mes, e.ano)}
+                </Button>
+                <Badge size="xs" variant="light" color={e.status === 'publicada' ? 'teal' : 'gray'}>
+                  {e.status === 'publicada' ? 'publicada' : 'rascunho'}
+                </Badge>
+                <Tooltip label="Excluir esta escala">
+                  <ActionIcon variant="subtle" color="red" size="sm" onClick={() => confirmarExclusaoEscala(e.id, rotuloMesAno(e.mes, e.ano))}>
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+            ))}
+          </Group>
+        </Card>
+      )}
+
       {palavraSlots.length === 0 && (
         <Alert color="orange" icon={<IconAlertTriangle />} title="Sem celebrações da Palavra neste mês">
           Verifique se as comunidades têm celebrações cadastradas em <b>Comunidades → Celebrações</b>.
@@ -362,6 +426,11 @@ export function SchedulePage() {
               <Button variant="light" color="red" leftSection={<IconFileTypePdf size={16} />} onClick={baixarPdf}>
                 PDF
               </Button>
+              {scheduleId != null && (
+                <Button variant="subtle" color="red" leftSection={<IconTrash size={16} />} onClick={() => confirmarExclusaoEscala(scheduleId, rotuloMesAno(mes, ano))}>
+                  Excluir
+                </Button>
+              )}
             </Group>
           </Group>
         </Card>
