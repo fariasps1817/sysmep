@@ -1,0 +1,37 @@
+# Configuração de build e funções da Netlify
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[dev]
+  command = "npm run dev"
+  targetPort = 5173
+  port = 8888
+  framework = "#custom"
+  autoLaunch = false
+
+# Atalhos amigáveis: /api/* e /auth/* chamam as funções
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/auth/*"
+  to = "/.netlify/functions/auth/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/whatsapp/*"
+  to = "/.netlify/functions/whatsapp/:splat"
+  status = 200
+
+# SPA fallback (sempre por último)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

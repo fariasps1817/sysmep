@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+.netlify/
+
+# Variáveis de ambiente (NUNCA commitar credenciais)
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+*.log
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Brasão original na raiz (movido para src/assets e public)
+/brasao1.png
+
+# Arquivo espúrio do netlify-cli
+deno.lock
