@@ -9,6 +9,7 @@ import { CommunitiesPage } from './pages/CommunitiesPage'
 import { ParishSettingsPage } from './pages/ParishSettingsPage'
 import { SchedulePage } from './pages/SchedulePage'
 import { BirthdaysPage } from './pages/BirthdaysPage'
+import { OperatorsPage } from './pages/OperatorsPage'
 
 function Protegido({ children }: { children: React.ReactNode }) {
   const { operador, carregando } = useAuth()
@@ -38,6 +39,7 @@ export function App() {
       <Route path="/comunidades" element={<Protegido><CommunitiesPage /></Protegido>} />
       <Route path="/escala" element={<Protegido><SchedulePage /></Protegido>} />
       <Route path="/aniversariantes" element={<Protegido><BirthdaysPage /></Protegido>} />
+      <Route path="/operadores" element={<Protegido><OperatorsPage /></Protegido>} />
       <Route path="/configuracoes" element={<Protegido><ParishSettingsPage /></Protegido>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

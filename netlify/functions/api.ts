@@ -1,5 +1,6 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
 import { eq, asc, and, desc } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
 import { db } from '../../db/client'
 import {
   ministers,
@@ -9,9 +10,10 @@ import {
   ministerUnavailability,
   schedules,
   assignments,
+  operators,
 } from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
-import { lerSessao } from './_lib/auth'
+import { lerSessao, type SessaoPayload } from './_lib/auth'
 
 export const handler: Handler = async (event) => {
   // Toda a API exige login.
@@ -36,6 +38,8 @@ export const handler: Handler = async (event) => {
         return await availabilityHandler(event, metodo, id)
       case 'schedules':
         return await schedulesHandler(event, metodo, id, sessao.id)
+      case 'operators':
+        return await operatorsHandler(event, metodo, idStr, sessao)
       default:
         return erro(404, `Recurso "${recurso ?? ''}" não encontrado.`)
     }
@@ -315,6 +319,92 @@ async function schedulesHandler(event: HandlerEvent, metodo: string, id: number 
 
   if (metodo === 'DELETE' && id) {
     await db.delete(schedules).where(eq(schedules.id, id))
+    return json(200, { ok: true })
+  }
+
+  return erro(405, 'Método não permitido.')
+}
+
+// ---------- Operadores (coordenadores) ----------
+const colsOperador = {
+  id: operators.id,
+  nome: operators.nome,
+  email: operators.email,
+  papel: operators.papel,
+  ativo: operators.ativo,
+  criadoEm: operators.criadoEm,
+}
+
+async function operatorsHandler(
+  event: HandlerEvent,
+  metodo: string,
+  idStr: string | undefined,
+  sessao: SessaoPayload,
+) {
+  const ehAdmin = sessao.papel === 'admin'
+
+  // Listar operadores
+  if (metodo === 'GET' && !idStr) {
+    const rows = await db.select(colsOperador).from(operators).orderBy(asc(operators.nome))
+    return json(200, rows)
+  }
+
+  // Trocar a própria senha (qualquer operador)
+  if (idStr === 'me' && metodo === 'PATCH') {
+    const b = lerCorpo<{ senhaAtual?: string; novaSenha?: string }>(event)
+    if (!b.senhaAtual || !b.novaSenha) return erro(400, 'Informe a senha atual e a nova senha.')
+    if (b.novaSenha.length < 4) return erro(400, 'A nova senha deve ter ao menos 4 caracteres.')
+    const [self] = await db.select().from(operators).where(eq(operators.id, sessao.id)).limit(1)
+    if (!self || !bcrypt.compareSync(b.senhaAtual, self.senhaHash)) return erro(401, 'Senha atual incorreta.')
+    await db.update(operators).set({ senhaHash: bcrypt.hashSync(b.novaSenha, 10) }).where(eq(operators.id, sessao.id))
+    return json(200, { ok: true })
+  }
+
+  // A partir daqui, apenas administradores
+  if (!ehAdmin) return erro(403, 'Apenas administradores podem gerenciar operadores.')
+
+  if (metodo === 'POST') {
+    const b = lerCorpo<Record<string, unknown>>(event)
+    const nome = str(b.nome)
+    const email = str(b.email)?.toLowerCase()
+    const senha = str(b.senha)
+    if (!nome || !email || !senha) return erro(400, 'Informe nome, e-mail e senha.')
+    if (senha.length < 4) return erro(400, 'A senha deve ter ao menos 4 caracteres.')
+    const [existe] = await db.select({ id: operators.id }).from(operators).where(eq(operators.email, email)).limit(1)
+    if (existe) return erro(409, 'Já existe um operador com esse e-mail.')
+    const papel = b.papel === 'admin' ? 'admin' : 'coordenador'
+    const [row] = await db
+      .insert(operators)
+      .values({ nome, email, senhaHash: bcrypt.hashSync(senha, 10), papel, ativo: true })
+      .returning(colsOperador)
+    return json(201, row)
+  }
+
+  const id = idStr ? Number(idStr) : undefined
+  if (metodo === 'PATCH' && id) {
+    const b = lerCorpo<Record<string, unknown>>(event)
+    const dados: Record<string, unknown> = {}
+    if (str(b.nome) !== undefined) dados.nome = str(b.nome)
+    if (str(b.email) !== undefined) dados.email = str(b.email)!.toLowerCase()
+    if (b.papel !== undefined) dados.papel = b.papel === 'admin' ? 'admin' : 'coordenador'
+    if (b.ativo !== undefined) dados.ativo = bool(b.ativo, true)
+    if (str(b.senha)) dados.senhaHash = bcrypt.hashSync(str(b.senha)!, 10)
+    if (Object.keys(dados).length === 0) return erro(400, 'Nada para atualizar.')
+    if (id === sessao.id && dados.ativo === false) return erro(400, 'Você não pode desativar a si mesmo.')
+    const [row] = await db.update(operators).set(dados).where(eq(operators.id, id)).returning(colsOperador)
+    if (!row) return erro(404, 'Operador não encontrado.')
+    return json(200, row)
+  }
+
+  if (metodo === 'DELETE' && id) {
+    if (id === sessao.id) return erro(400, 'Você não pode remover a si mesmo.')
+    const [alvo] = await db.select({ papel: operators.papel }).from(operators).where(eq(operators.id, id)).limit(1)
+    if (!alvo) return erro(404, 'Operador não encontrado.')
+    if (alvo.papel === 'admin') {
+      const admins = await db.select({ id: operators.id }).from(operators).where(and(eq(operators.papel, 'admin'), eq(operators.ativo, true)))
+      if (admins.length <= 1) return erro(400, 'Não é possível remover o único administrador.')
+    }
+    await db.delete(operators).where(eq(operators.id, id))
     return json(200, { ok: true })
   }
 

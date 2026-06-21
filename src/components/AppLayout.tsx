@@ -23,6 +23,8 @@ import {
   IconSettings,
   IconLogout,
   IconChevronDown,
+  IconUserShield,
+  IconKey,
 } from '@tabler/icons-react'
 import { useAuth } from '../lib/auth'
 import brasao from '../assets/brasao.png'
@@ -33,6 +35,7 @@ const itensMenu = [
   { to: '/ministros', label: 'Ministros', icon: IconUsers },
   { to: '/comunidades', label: 'Comunidades', icon: IconBuildingChurch },
   { to: '/aniversariantes', label: 'Aniversariantes', icon: IconCake },
+  { to: '/operadores', label: 'Operadores', icon: IconUserShield },
   { to: '/configuracoes', label: 'Configurações', icon: IconSettings },
 ]
 
@@ -78,6 +81,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Label>{operador?.email}</Menu.Label>
+              <Menu.Item
+                leftSection={<IconKey style={{ width: rem(16), height: rem(16) }} />}
+                onClick={() => navigate('/operadores')}
+              >
+                Trocar senha
+              </Menu.Item>
+              <Menu.Divider />
               <Menu.Item
                 leftSection={<IconLogout style={{ width: rem(16), height: rem(16) }} />}
                 onClick={sair}
