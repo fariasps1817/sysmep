@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import {
-  ActionIcon,
   Alert,
+  Badge,
   Button,
   Center,
+  Divider,
   Group,
   Loader,
   Modal,
@@ -13,7 +14,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -56,6 +56,7 @@ export function CommunitiesPage() {
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Comunidade | null>(null)
   const [celebracoesDe, setCelebracoesDe] = useState<Comunidade | null>(null)
+  const [detalheId, setDetalheId] = useState<number | null>(null)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -109,6 +110,11 @@ export function CommunitiesPage() {
     onError: (e: Error) => notifications.show({ color: 'red', title: 'Erro ao remover', message: e.message }),
   })
 
+  const alternarAtivo = useMutation({
+    mutationFn: (c: Comunidade) => api.patch(`/api/communities/${c.id}`, { ativo: !c.ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['comunidades'] }),
+  })
+
   function abrirNovo() {
     setEditando(null)
     form.setValues(valoresIniciais)
@@ -143,6 +149,8 @@ export function CommunitiesPage() {
     })
   }
 
+  const detalhe = (data ?? []).find((c) => c.id === detalheId) ?? null
+
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
@@ -162,56 +170,45 @@ export function CommunitiesPage() {
       {isLoading ? (
         <Center py="xl"><Loader /></Center>
       ) : data && data.length > 0 ? (
-        <Table.ScrollContainer minWidth={640}>
+        <>
+        <Table.ScrollContainer minWidth={460}>
           <Table striped highlightOnHover verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Nome</Table.Th>
                 <Table.Th>Padroeiro</Table.Th>
                 <Table.Th>Celebrações</Table.Th>
-                <Table.Th>Representante</Table.Th>
                 <Table.Th>Ativa</Table.Th>
-                <Table.Th ta="right">Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {data.map((c) => (
-                <Table.Tr key={c.id} opacity={c.ativo ? 1 : 0.55}>
-                  <Table.Td><Text fw={500}>{c.nome}</Text></Table.Td>
-                  <Table.Td>{c.nomePadroeiro || '—'}</Table.Td>
-                  <Table.Td>
-                    {(() => {
-                      const s = resumoCelebracoes(c.id)
-                      return (
-                        <Button
-                          variant="light"
-                          color={s.total === 0 ? 'orange' : 'gray'}
-                          size="compact-sm"
-                          leftSection={<IconCalendarEvent size={14} />}
-                          onClick={() => setCelebracoesDe(c)}
-                        >
-                          {s.total === 0 ? 'Definir' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}
-                        </Button>
-                      )
-                    })()}
-                  </Table.Td>
-                  <Table.Td>{c.coordenadorNome || '—'}</Table.Td>
-                  <Table.Td>{c.ativo ? 'Sim' : 'Não'}</Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" justify="flex-end" wrap="nowrap">
-                      <Tooltip label="Editar">
-                        <ActionIcon variant="subtle" onClick={() => abrirEdicao(c)}><IconPencil size={18} /></ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Remover">
-                        <ActionIcon variant="subtle" color="red" onClick={() => confirmarExclusao(c)}><IconTrash size={18} /></ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
+              {data.map((c) => {
+                const s = resumoCelebracoes(c.id)
+                return (
+                  <Table.Tr
+                    key={c.id}
+                    opacity={c.ativo ? 1 : 0.55}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setDetalheId(c.id)}
+                  >
+                    <Table.Td><Text fw={500}>{c.nome}</Text></Table.Td>
+                    <Table.Td>{c.nomePadroeiro || '—'}</Table.Td>
+                    <Table.Td>
+                      <Badge color={s.total === 0 ? 'orange' : 'gray'} variant="light">
+                        {s.total === 0 ? 'Definir' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge color={c.ativo ? 'teal' : 'gray'} variant="light">{c.ativo ? 'Ativa' : 'Inativa'}</Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                )
+              })}
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
+        <Text size="xs" c="dimmed" mt={6}>Toque em uma comunidade para ver detalhes e ações.</Text>
+        </>
       ) : (
         !isError && (
           <Center py="xl">
@@ -270,6 +267,36 @@ export function CommunitiesPage() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      <Modal opened={detalhe !== null} onClose={() => setDetalheId(null)} title={detalhe?.nome ?? ''} size="md">
+        {detalhe &&
+          (() => {
+            const s = resumoCelebracoes(detalhe.id)
+            return (
+              <Stack gap="sm">
+                <Stack gap={6}>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">Padroeiro(a)</Text><Text size="sm" fw={500}>{detalhe.nomePadroeiro || '—'}</Text></Group>
+                  <Group justify="space-between" wrap="nowrap"><Text size="sm" c="dimmed">Endereço</Text><Text size="sm" fw={500} ta="right">{detalhe.endereco || '—'}</Text></Group>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">Representante</Text><Text size="sm" fw={500}>{detalhe.coordenadorNome || '—'}</Text></Group>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">WhatsApp</Text><Text size="sm" fw={500}>{detalhe.coordenadorWhatsapp || '—'}</Text></Group>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">Celebrações</Text><Text size="sm" fw={500}>{s.total === 0 ? 'nenhuma' : `${s.palavra} palavra${s.missa ? ` · ${s.missa} missa` : ''}`}</Text></Group>
+                  <Group justify="space-between"><Text size="sm" c="dimmed">Situação</Text><Badge color={detalhe.ativo ? 'teal' : 'gray'} variant="light">{detalhe.ativo ? 'Ativa' : 'Inativa'}</Badge></Group>
+                </Stack>
+                <Divider />
+                <Group grow>
+                  <Button variant="light" leftSection={<IconPencil size={16} />} onClick={() => { const c = detalhe; setDetalheId(null); abrirEdicao(c) }}>Editar</Button>
+                  <Button variant="light" color="grape" leftSection={<IconCalendarEvent size={16} />} onClick={() => { const c = detalhe; setDetalheId(null); setCelebracoesDe(c) }}>Celebrações</Button>
+                </Group>
+                <Group grow>
+                  <Button variant="light" color={detalhe.ativo ? 'gray' : 'teal'} onClick={() => alternarAtivo.mutate(detalhe)}>
+                    {detalhe.ativo ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => confirmarExclusao(detalhe)}>Excluir</Button>
+                </Group>
+              </Stack>
+            )
+          })()}
       </Modal>
 
       <CelebrationRulesDrawer comunidade={celebracoesDe} onClose={() => setCelebracoesDe(null)} />
