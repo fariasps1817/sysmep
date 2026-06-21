@@ -38,10 +38,15 @@ export function gerarEscala(e: EntradaGerar): AtribuicaoGerada[] {
 
   const count = new Map<number, number>()
   const datas = new Map<number, Set<string>>()
+  // quantas vezes cada ministro já foi a cada comunidade (variedade)
+  const comPorMin = new Map<number, Map<number, number>>()
   for (const m of e.ministros) {
     count.set(m.id, 0)
     datas.set(m.id, new Set())
+    comPorMin.set(m.id, new Map())
   }
+  const vezesNaComunidade = (ministerId: number, communityId: number) =>
+    comPorMin.get(ministerId)?.get(communityId) ?? 0
 
   const atribuicoes = new Map<string, AtribuicaoGerada>()
   const atribuir = (s: SlotGerado, ministerId: number | null, locked: boolean, motivo: string) => {
@@ -58,6 +63,8 @@ export function gerarEscala(e: EntradaGerar): AtribuicaoGerada[] {
     if (ministerId != null) {
       count.set(ministerId, (count.get(ministerId) ?? 0) + 1)
       datas.get(ministerId)?.add(s.data)
+      const cm = comPorMin.get(ministerId)
+      if (cm) cm.set(s.communityId, (cm.get(s.communityId) ?? 0) + 1)
     }
   }
 
@@ -100,6 +107,7 @@ export function gerarEscala(e: EntradaGerar): AtribuicaoGerada[] {
     cand.sort(
       (a, b) =>
         count.get(a.id)! - count.get(b.id)! ||
+        vezesNaComunidade(a.id, s.communityId) - vezesNaComunidade(b.id, s.communityId) ||
         penalidadeEspaco(a, s) - penalidadeEspaco(b, s) ||
         a.id - b.id,
     )
@@ -127,10 +135,14 @@ export function gerarEscala(e: EntradaGerar): AtribuicaoGerada[] {
             // move a atribuição do doador para o alvo
             datas.get(doador.id)!.delete(a.data)
             count.set(doador.id, count.get(doador.id)! - 1)
+            const cmD = comPorMin.get(doador.id)
+            if (cmD) cmD.set(a.communityId, Math.max(0, (cmD.get(a.communityId) ?? 0) - 1))
             a.ministerId = alvo.id
             a.motivo = 'Reequilibrado para dividir melhor'
             datas.get(alvo.id)!.add(a.data)
             count.set(alvo.id, count.get(alvo.id)! + 1)
+            const cmA = comPorMin.get(alvo.id)
+            if (cmA) cmA.set(a.communityId, (cmA.get(a.communityId) ?? 0) + 1)
             mudou = true
             break busca
           }
