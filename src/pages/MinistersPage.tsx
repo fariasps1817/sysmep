@@ -22,10 +22,19 @@ import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconPlus, IconPencil, IconTrash, IconAlertCircle, IconUserOff } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconPencil,
+  IconTrash,
+  IconAlertCircle,
+  IconUserOff,
+  IconCalendarOff,
+} from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro } from '../lib/types'
 import { paraISO, deISO, formatarBR } from '../lib/datas'
+import type { Indisponibilidade } from '../lib/disponibilidade'
+import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
 
 type FormValores = {
   nomeCompleto: string
@@ -55,6 +64,7 @@ export function MinistersPage() {
   const qc = useQueryClient()
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Ministro | null>(null)
+  const [dispDe, setDispDe] = useState<Ministro | null>(null)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -65,6 +75,15 @@ export function MinistersPage() {
     queryKey: ['ministros'],
     queryFn: () => api.get<Ministro[]>('/api/ministers'),
   })
+
+  const { data: restricoes } = useQuery({
+    queryKey: ['availability-todas'],
+    queryFn: () => api.get<Indisponibilidade[]>('/api/availability'),
+  })
+
+  function qtdRestricoes(ministerId: number) {
+    return (restricoes ?? []).filter((r) => r.ministerId === ministerId).length
+  }
 
   const salvar = useMutation({
     mutationFn: (valores: FormValores) => {
@@ -174,6 +193,7 @@ export function MinistersPage() {
                 <Table.Th>Bairro</Table.Th>
                 <Table.Th>Nascimento</Table.Th>
                 <Table.Th>MESC</Table.Th>
+                <Table.Th>Disponib.</Table.Th>
                 <Table.Th>Ativo</Table.Th>
                 <Table.Th ta="right">Ações</Table.Th>
               </Table.Tr>
@@ -189,6 +209,17 @@ export function MinistersPage() {
                   <Table.Td>{m.bairro || '—'}</Table.Td>
                   <Table.Td>{formatarBR(m.dataNascimento)}</Table.Td>
                   <Table.Td>{m.ministroEucaristia ? <Badge color="grape" variant="light">Sim</Badge> : '—'}</Table.Td>
+                  <Table.Td>
+                    <Button
+                      variant="light"
+                      color={qtdRestricoes(m.id) ? 'orange' : 'gray'}
+                      size="compact-sm"
+                      leftSection={<IconCalendarOff size={14} />}
+                      onClick={() => setDispDe(m)}
+                    >
+                      {qtdRestricoes(m.id) ? `${qtdRestricoes(m.id)} restr.` : 'Sempre'}
+                    </Button>
+                  </Table.Td>
                   <Table.Td>
                     <Switch
                       checked={m.ativo}
@@ -250,6 +281,11 @@ export function MinistersPage() {
           </Stack>
         </form>
       </Modal>
+
+      <MinisterAvailabilityDrawer
+        ministro={dispDe}
+        onClose={() => setDispDe(null)}
+      />
     </Stack>
   )
 }

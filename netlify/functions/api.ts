@@ -1,7 +1,13 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
 import { eq, asc } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { ministers, communities, parishSettings, celebrationRules } from '../../db/schema'
+import {
+  ministers,
+  communities,
+  parishSettings,
+  celebrationRules,
+  ministerUnavailability,
+} from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
 import { lerSessao } from './_lib/auth'
 
@@ -24,6 +30,8 @@ export const handler: Handler = async (event) => {
         return await communitiesHandler(event, metodo, id)
       case 'rules':
         return await rulesHandler(event, metodo, id)
+      case 'availability':
+        return await availabilityHandler(event, metodo, id)
       default:
         return erro(404, `Recurso "${recurso ?? ''}" não encontrado.`)
     }
@@ -183,6 +191,51 @@ function montarRegra(b: Record<string, unknown>, parcial = false) {
     tipo: str(b.tipo) === 'missa' ? 'missa' : 'palavra',
     ativo: bool(b.ativo, true),
     rotulo: str(b.rotulo),
+  }
+  if (parcial) Object.keys(dados).forEach((k) => dados[k] === undefined && delete dados[k])
+  return dados
+}
+
+// ---------- Indisponibilidades dos ministros ----------
+async function availabilityHandler(event: HandlerEvent, metodo: string, id?: number) {
+  if (metodo === 'GET' && !id) {
+    const ministerId = num(event.queryStringParameters?.ministerId)
+    const base = db.select().from(ministerUnavailability)
+    const rows = ministerId
+      ? await base.where(eq(ministerUnavailability.ministerId, ministerId)).orderBy(asc(ministerUnavailability.id))
+      : await base.orderBy(asc(ministerUnavailability.ministerId))
+    return json(200, rows)
+  }
+  if (metodo === 'POST') {
+    const dados = montarIndisp(lerCorpo(event))
+    if (!dados.ministerId) return erro(400, 'Informe o ministro.')
+    if (!dados.kind) return erro(400, 'Informe o tipo de restrição.')
+    const row = await db.insert(ministerUnavailability).values(dados as typeof ministerUnavailability.$inferInsert).returning()
+    return json(201, row[0])
+  }
+  if ((metodo === 'PUT' || metodo === 'PATCH') && id) {
+    const dados = montarIndisp(lerCorpo(event), true) as Partial<typeof ministerUnavailability.$inferInsert>
+    const row = await db.update(ministerUnavailability).set(dados).where(eq(ministerUnavailability.id, id)).returning()
+    if (!row.length) return erro(404, 'Restrição não encontrada.')
+    return json(200, row[0])
+  }
+  if (metodo === 'DELETE' && id) {
+    await db.delete(ministerUnavailability).where(eq(ministerUnavailability.id, id))
+    return json(200, { ok: true })
+  }
+  return erro(405, 'Método não permitido.')
+}
+
+function montarIndisp(b: Record<string, unknown>, parcial = false) {
+  const kind = str(b.kind)
+  const dados: Record<string, unknown> = {
+    ministerId: num(b.ministerId),
+    kind,
+    weekday: kind === 'weekday' ? num(b.weekday) ?? null : null,
+    parity: kind === 'parity' ? (str(b.parity) === 'impar' ? 'impar' : 'par') : null,
+    dataInicio: kind === 'date' || kind === 'date_range' ? str(b.dataInicio) ?? null : null,
+    dataFim: kind === 'date_range' ? str(b.dataFim) ?? null : null,
+    nota: str(b.nota),
   }
   if (parcial) Object.keys(dados).forEach((k) => dados[k] === undefined && delete dados[k])
   return dados
