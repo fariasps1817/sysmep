@@ -312,9 +312,9 @@ export function MinistersPage() {
 //                    label="Como é conhecido (aparece na escala e no PDF)"
 //                    placeholder={sugestaoNomeCurto(form.values.nomeCompleto) || 'Ex.: Netinho'}
 //                    description={`Sugestão automática: ${sugestaoNomeCurto(form.values.nomeCompleto) || '—'}`}
-//                    value={form.values.nomeCurto}
-//                    onChange={(e) => form.setFieldValue('nomeCurto', e.currentTarget.value)}
-//                    onBlur={(e) => form.setFieldValue('nomeCurto', tituloCaso(e.currentTarget.value))}
+                    value={form.values.nomeCurto}
+                    onChange={(e) => form.setFieldValue('nomeCurto', e.currentTarget.value)}
+                    onBlur={(e) => form.setFieldValue('nomeCurto', tituloCaso(e.currentTarget.value))}
                   />
                 </Accordion.Panel>
               </Accordion.Item>
