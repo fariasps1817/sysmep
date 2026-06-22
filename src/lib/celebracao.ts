@@ -5,7 +5,7 @@ export type Regra = {
   horario: string
   frequencia: 'weekly' | 'monthly_nth'
   nth: number | null
-  tipo: 'missa' | 'palavra'
+  tipo: 'missa' | 'palavra' | 'cancelado'
   ativo: boolean
   rotulo: string | null
 }
@@ -48,10 +48,10 @@ export function formatarHora(horario: string): string {
 // Texto amigável: "Toda quinta-feira, 19h" ou "3º sábado do mês, 17h"
 export function descreverQuando(r: Regra): string {
   const dia = DIAS_SEMANA[r.weekday] ?? '?'
-  const hora = formatarHora(r.horario)
+  const hora = r.tipo === 'cancelado' ? '' : `, ${formatarHora(r.horario)}`
   if (r.frequencia === 'monthly_nth') {
     const ord = r.nth === -1 ? 'Último' : `${r.nth}º`
-    return `${ord} ${dia.toLowerCase()} do mês, ${hora}`
+    return `${ord} ${dia.toLowerCase()} do mês${hora}`
   }
-  return `Toda ${dia.toLowerCase()}, ${hora}`
+  return `Toda ${dia.toLowerCase()}${hora}`
 }

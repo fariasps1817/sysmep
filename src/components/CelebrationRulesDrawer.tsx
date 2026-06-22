@@ -36,7 +36,7 @@ type FormValores = {
   nth: string
   weekday: string
   horario: string
-  tipo: 'palavra' | 'missa'
+  tipo: 'palavra' | 'missa' | 'cancelado'
   rotulo: string
 }
 
@@ -150,8 +150,8 @@ export function CelebrationRulesDrawer({ comunidade, onClose }: Props) {
     >
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          Cadastre os dias fixos de celebração. Marque como <b>Missa</b> os dias que não precisam de
-          ministro (ex.: 3º sábado do mês).
+          Cadastre os dias fixos de celebração. Use <b>Missa</b> nos dias que não precisam de ministro
+          e <b>Sem celebração</b> para uma semana específica em que não há nada (ex.: 3ª quinta do mês).
         </Text>
 
         {!mostrarForm && (
@@ -165,38 +165,55 @@ export function CelebrationRulesDrawer({ comunidade, onClose }: Props) {
             <form onSubmit={form.onSubmit((v) => salvar.mutate(v))}>
               <Stack gap="sm">
                 <div>
-                  <Text size="sm" fw={500} mb={4}>Quando acontece</Text>
+                  <Text size="sm" fw={500} mb={4}>Tipo</Text>
                   <SegmentedControl
                     fullWidth
                     data={[
-                      { label: 'Toda semana', value: 'weekly' },
-                      { label: 'Uma vez no mês', value: 'monthly_nth' },
+                      { label: 'Palavra', value: 'palavra' },
+                      { label: 'Missa', value: 'missa' },
+                      { label: 'Sem celebração', value: 'cancelado' },
                     ]}
-                    {...form.getInputProps('frequencia')}
+                    value={form.values.tipo}
+                    onChange={(v) => {
+                      form.setFieldValue('tipo', v as FormValores['tipo'])
+                      if (v === 'cancelado') form.setFieldValue('frequencia', 'monthly_nth')
+                    }}
                   />
+                  {form.values.tipo === 'missa' && (
+                    <Text size="xs" c="dimmed" mt={4}>Dia de missa — não precisa de ministro.</Text>
+                  )}
+                  {form.values.tipo === 'cancelado' && (
+                    <Text size="xs" c="dimmed" mt={4}>Marca uma semana sem celebração (ex.: 3ª quinta do mês).</Text>
+                  )}
                 </div>
+
+                {form.values.tipo !== 'cancelado' && (
+                  <div>
+                    <Text size="sm" fw={500} mb={4}>Quando acontece</Text>
+                    <SegmentedControl
+                      fullWidth
+                      data={[
+                        { label: 'Toda semana', value: 'weekly' },
+                        { label: 'Uma vez no mês', value: 'monthly_nth' },
+                      ]}
+                      {...form.getInputProps('frequencia')}
+                    />
+                  </div>
+                )}
 
                 <Group grow align="flex-end">
                   {form.values.frequencia === 'monthly_nth' && (
                     <Select label="Ocorrência" data={OPCOES_NTH} allowDeselect={false} {...form.getInputProps('nth')} />
                   )}
                   <Select label="Dia da semana" data={OPCOES_DIA} allowDeselect={false} {...form.getInputProps('weekday')} />
-                  <TimeInput label="Horário" leftSection={<IconClockHour4 size={16} />} {...form.getInputProps('horario')} />
+                  {form.values.tipo !== 'cancelado' && (
+                    <TimeInput label="Horário" leftSection={<IconClockHour4 size={16} />} {...form.getInputProps('horario')} />
+                  )}
                 </Group>
 
-                <div>
-                  <Text size="sm" fw={500} mb={4}>Tipo de celebração</Text>
-                  <SegmentedControl
-                    fullWidth
-                    data={[
-                      { label: 'Celebração da Palavra', value: 'palavra' },
-                      { label: 'Missa (sem ministro)', value: 'missa' },
-                    ]}
-                    {...form.getInputProps('tipo')}
-                  />
-                </div>
-
-                <TextInput label="Rótulo (opcional)" placeholder="Ex.: Missa do mês" {...form.getInputProps('rotulo')} />
+                {form.values.tipo !== 'cancelado' && (
+                  <TextInput label="Rótulo (opcional)" placeholder="Ex.: Missa do mês" {...form.getInputProps('rotulo')} />
+                )}
 
                 <Group justify="flex-end" gap="xs">
                   <Button variant="default" size="sm" onClick={cancelarForm}>Cancelar</Button>
@@ -218,8 +235,8 @@ export function CelebrationRulesDrawer({ comunidade, onClose }: Props) {
                 <Group justify="space-between" wrap="nowrap">
                   <div>
                     <Group gap="xs" mb={2}>
-                      <Badge size="sm" color={r.tipo === 'missa' ? 'orange' : 'marian'} variant="light">
-                        {r.tipo === 'missa' ? 'Missa' : 'Palavra'}
+                      <Badge size="sm" color={r.tipo === 'missa' ? 'orange' : r.tipo === 'cancelado' ? 'gray' : 'marian'} variant="light">
+                        {r.tipo === 'missa' ? 'Missa' : r.tipo === 'cancelado' ? 'Sem celebração' : 'Palavra'}
                       </Badge>
                       {!r.ativo && <Badge size="sm" color="gray" variant="light">inativa</Badge>}
                     </Group>

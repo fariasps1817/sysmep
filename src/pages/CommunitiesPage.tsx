@@ -84,7 +84,7 @@ export function CommunitiesPage() {
   // Dias padrão (celebrações semanais), ex.: "Sábados 19h, Quintas 19h".
   function diasPadrao(comunidadeId: number): string {
     return (regras ?? [])
-      .filter((r) => r.communityId === comunidadeId && r.ativo && r.frequencia === 'weekly')
+      .filter((r) => r.communityId === comunidadeId && r.ativo && r.frequencia === 'weekly' && r.tipo !== 'cancelado')
       .sort((a, b) => a.weekday - b.weekday || a.horario.localeCompare(b.horario))
       .map((r) => `${DIAS_PLURAL[r.weekday]} ${formatarHora(r.horario)}`)
       .join(', ')

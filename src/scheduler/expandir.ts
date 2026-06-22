@@ -21,7 +21,7 @@ export type SlotGerado = {
   rotulo: string | null
 }
 
-type Candidato = { horario: string; tipo: 'missa' | 'palavra'; prio: number; rotulo: string | null }
+type Candidato = { horario: string; tipo: 'missa' | 'palavra' | 'cancelado'; prio: number; rotulo: string | null }
 
 // Expande as regras de celebração para um mês concreto.
 // Precedência por (comunidade, data): override > mensal (nth) > semanal.
@@ -80,6 +80,7 @@ export function expandirMes(
   for (const [communityId, porData] of mapa) {
     const nome = ativas.get(communityId)?.nome ?? '?'
     for (const [data, cand] of porData) {
+      if (cand.tipo === 'cancelado') continue // semana sem celebração
       slots.push({
         id: `${communityId}-${data}`,
         data,

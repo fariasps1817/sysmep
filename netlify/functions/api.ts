@@ -200,13 +200,14 @@ async function rulesHandler(event: HandlerEvent, metodo: string, id?: number) {
 
 function montarRegra(b: Record<string, unknown>, parcial = false) {
   const freq = str(b.frequencia) === 'monthly_nth' ? 'monthly_nth' : 'weekly'
+  const t = str(b.tipo)
   const dados: Record<string, unknown> = {
     communityId: num(b.communityId),
     weekday: num(b.weekday),
-    horario: str(b.horario),
+    horario: str(b.horario) ?? '00:00',
     frequencia: freq,
     nth: freq === 'monthly_nth' ? num(b.nth) ?? null : null,
-    tipo: str(b.tipo) === 'missa' ? 'missa' : 'palavra',
+    tipo: t === 'missa' ? 'missa' : t === 'cancelado' ? 'cancelado' : 'palavra',
     ativo: bool(b.ativo, true),
     rotulo: str(b.rotulo),
   }
