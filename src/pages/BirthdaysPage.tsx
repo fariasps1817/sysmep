@@ -11,9 +11,16 @@ import {
   Text,
   ThemeIcon,
   Title,
+  Tooltip,
 } from '@mantine/core'
-import { useQuery } from '@tanstack/react-query'
-import { IconCake, IconBrandWhatsapp } from '@tabler/icons-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  IconCake,
+  IconBrandWhatsapp,
+  IconCircleCheck,
+  IconCircleX,
+  IconCircleDashed,
+} from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro, ConfigParoquia } from '../lib/types'
 import { formatarBR } from '../lib/datas'
@@ -25,15 +32,34 @@ import { ListaPDF } from '../pdf/ListaPDF'
 import { ExportarPdf } from '../components/ExportarPdf'
 import brasaoPadrao from '../assets/brasao.png'
 
+type LogEnvio = { destinatarioId: number | null; status: string; enviadoEm: string }
+
 export function BirthdaysPage() {
+  const qc = useQueryClient()
   const [mes, setMes] = useState(new Date().getMonth() + 1)
   const [modal, setModal] = useState<{ titulo: string; mensagens: MensagemEnvio[] } | null>(null)
 
   const { data: ministros, isLoading } = useQuery({ queryKey: ['ministros'], queryFn: () => api.get<Ministro[]>('/api/ministers') })
   const { data: paroquia } = useQuery({ queryKey: ['config-paroquia'], queryFn: () => api.get<ConfigParoquia | null>('/api/parish-settings') })
+  const { data: logs } = useQuery({ queryKey: ['msglog-aniversario'], queryFn: () => api.get<LogEnvio[]>('/api/message-log?tipo=aniversario') })
 
   const nomeParoquia = paroquia?.nomeParoquia ?? 'Paróquia'
   const anoAtual = new Date().getFullYear()
+
+  // Status do envio de parabéns no ano corrente (a partir do message_log).
+  function statusEnvio(ministerId: number): 'enviado' | 'erro' | 'nenhuma' {
+    const doMin = (logs ?? []).filter(
+      (l) => l.destinatarioId === ministerId && new Date(l.enviadoEm).getFullYear() === anoAtual,
+    )
+    if (doMin.some((l) => l.status === 'enviado')) return 'enviado'
+    if (doMin.some((l) => l.status === 'erro')) return 'erro'
+    return 'nenhuma'
+  }
+
+  function fecharModal() {
+    setModal(null)
+    qc.invalidateQueries({ queryKey: ['msglog-aniversario'] })
+  }
 
   const aniversariantes = useMemo(() => {
     return (ministros ?? [])
@@ -51,6 +77,8 @@ export function BirthdaysPage() {
       label: m.nomeCompleto,
       para: normalizarWhatsapp(m.whatsapp),
       mensagem: mensagemAniversario(m.tratamento, m.nomeCompleto, nomeParoquia),
+      tipo: 'aniversario',
+      destinatarioId: m.id,
     }))
   }
 
@@ -122,6 +150,7 @@ export function BirthdaysPage() {
                 <Table.Th>Nome</Table.Th>
                 <Table.Th>Faz</Table.Th>
                 <Table.Th>WhatsApp</Table.Th>
+                <Table.Th ta="center">Envio</Table.Th>
                 <Table.Th ta="right">Parabéns</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -135,6 +164,16 @@ export function BirthdaysPage() {
                   </Table.Td>
                   <Table.Td>{idade > 0 ? `${idade} anos` : '—'}</Table.Td>
                   <Table.Td>{m.whatsapp || '—'}</Table.Td>
+                  <Table.Td ta="center">
+                    {(() => {
+                      const st = statusEnvio(m.id)
+                      if (st === 'enviado')
+                        return <Tooltip label="Mensagem enviada"><ThemeIcon variant="transparent" color="teal" size="sm"><IconCircleCheck size={20} /></ThemeIcon></Tooltip>
+                      if (st === 'erro')
+                        return <Tooltip label="Falha no envio"><ThemeIcon variant="transparent" color="red" size="sm"><IconCircleX size={20} /></ThemeIcon></Tooltip>
+                      return <Tooltip label="Ainda não enviada"><ThemeIcon variant="transparent" color="gray" size="sm"><IconCircleDashed size={20} /></ThemeIcon></Tooltip>
+                    })()}
+                  </Table.Td>
                   <Table.Td ta="right">
                     <Button
                       size="compact-sm"
@@ -155,7 +194,7 @@ export function BirthdaysPage() {
 
       <EnvioWhatsappModal
         opened={modal !== null}
-        onClose={() => setModal(null)}
+        onClose={fecharModal}
         titulo={modal?.titulo ?? ''}
         descricao="As mensagens de parabéns serão enviadas pelo WhatsApp."
         mensagens={modal?.mensagens ?? []}

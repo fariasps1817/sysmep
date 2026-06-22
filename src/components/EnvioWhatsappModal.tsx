@@ -21,6 +21,8 @@ export type MensagemEnvio = {
   label: string // ex.: nome do ministro / comunidade
   para: string | null // telefone normalizado (null = sem número)
   mensagem: string
+  tipo?: string // p/ registro no message_log (ex.: 'aniversario')
+  destinatarioId?: number // p/ atribuir o envio a um ministro/comunidade
 }
 
 type Status = 'pendente' | 'enviando' | 'ok' | 'erro' | 'sem'
@@ -60,7 +62,7 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
       if (!m.para) continue
       setStatus((s) => ({ ...s, [m.id]: 'enviando' }))
       try {
-        await api.post('/whatsapp/enviar', { para: m.para, mensagem: m.mensagem })
+        await api.post('/whatsapp/enviar', { para: m.para, mensagem: m.mensagem, tipo: m.tipo, destinatarioId: m.destinatarioId })
         setStatus((s) => ({ ...s, [m.id]: 'ok' }))
         ok++
       } catch (e) {

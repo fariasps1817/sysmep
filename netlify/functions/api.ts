@@ -11,6 +11,7 @@ import {
   schedules,
   assignments,
   operators,
+  messageLog,
 } from '../../db/schema'
 import { json, erro, lerCorpo, segmentos } from './_lib/http'
 import { lerSessao, type SessaoPayload } from './_lib/auth'
@@ -40,6 +41,8 @@ export const handler: Handler = async (event) => {
         return await schedulesHandler(event, metodo, id, sessao.id)
       case 'operators':
         return await operatorsHandler(event, metodo, idStr, sessao)
+      case 'message-log':
+        return await messageLogHandler(event, metodo)
       default:
         return erro(404, `Recurso "${recurso ?? ''}" não encontrado.`)
     }
@@ -420,6 +423,22 @@ async function operatorsHandler(
   }
 
   return erro(405, 'Método não permitido.')
+}
+
+// ---------- Registro de mensagens (somente leitura) ----------
+async function messageLogHandler(event: HandlerEvent, metodo: string) {
+  if (metodo !== 'GET') return erro(405, 'Método não permitido.')
+  const tipo = str(event.queryStringParameters?.tipo)
+  const cols = {
+    destinatarioId: messageLog.destinatarioId,
+    destinatarioTipo: messageLog.destinatarioTipo,
+    status: messageLog.status,
+    enviadoEm: messageLog.enviadoEm,
+  }
+  const rows = tipo
+    ? await db.select(cols).from(messageLog).where(eq(messageLog.destinatarioTipo, tipo)).orderBy(desc(messageLog.id))
+    : await db.select(cols).from(messageLog).orderBy(desc(messageLog.id))
+  return json(200, rows)
 }
 
 // ---------- utilitários ----------
