@@ -79,6 +79,7 @@ export function BirthdaysPage() {
       mensagem: mensagemAniversario(m.tratamento, m.nomeCompleto, nomeParoquia),
       tipo: 'aniversario',
       destinatarioId: m.id,
+      jaEnviado: statusEnvio(m.id) === 'enviado',
     }))
   }
 

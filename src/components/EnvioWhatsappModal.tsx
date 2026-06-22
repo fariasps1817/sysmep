@@ -23,9 +23,10 @@ export type MensagemEnvio = {
   mensagem: string
   tipo?: string // p/ registro no message_log (ex.: 'aniversario')
   destinatarioId?: number // p/ atribuir o envio a um ministro/comunidade
+  jaEnviado?: boolean // já foi enviada antes (ex.: neste ano)
 }
 
-type Status = 'pendente' | 'enviando' | 'ok' | 'erro' | 'sem'
+type Status = 'pendente' | 'enviando' | 'ok' | 'erro' | 'sem' | 'ja'
 
 type Props = {
   opened: boolean
@@ -44,7 +45,7 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
   useEffect(() => {
     if (opened) {
       const inicial: Record<string, Status> = {}
-      for (const m of mensagens) inicial[m.id] = m.para ? 'pendente' : 'sem'
+      for (const m of mensagens) inicial[m.id] = m.para ? (m.jaEnviado ? 'ja' : 'pendente') : 'sem'
       setStatus(inicial)
       setErros({})
       setConcluido(false)
@@ -90,6 +91,8 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
         return <Badge color="red" leftSection={<IconX size={12} />}>erro</Badge>
       case 'sem':
         return <Badge color="orange" variant="light">sem número</Badge>
+      case 'ja':
+        return <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>já enviada</Badge>
       default:
         return <Badge color="gray" variant="light">pendente</Badge>
     }
