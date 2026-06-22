@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import {
-  ActionIcon,
   Button,
   Card,
   Center,
@@ -12,10 +11,9 @@ import {
   Text,
   ThemeIcon,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
-import { IconCake, IconBrandWhatsapp, IconFileTypePdf } from '@tabler/icons-react'
+import { IconCake, IconBrandWhatsapp } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro, ConfigParoquia } from '../lib/types'
 import { formatarBR } from '../lib/datas'
@@ -24,7 +22,7 @@ import { mensagemAniversario } from '../lib/mensagens'
 import { nomeMes } from '../scheduler/datas'
 import { EnvioWhatsappModal, type MensagemEnvio } from '../components/EnvioWhatsappModal'
 import { ListaPDF } from '../pdf/ListaPDF'
-import { baixarPdfDoc } from '../pdf/baixar'
+import { ExportarPdf } from '../components/ExportarPdf'
 import brasaoPadrao from '../assets/brasao.png'
 
 export function BirthdaysPage() {
@@ -56,14 +54,14 @@ export function BirthdaysPage() {
     }))
   }
 
-  function exportarPdf() {
+  function construirPdf() {
     const linhas = aniversariantes.map(({ ministro: m, dia, idade }) => ({
       dia: `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
       nome: m.nomeCompleto,
       idade: idade > 0 ? `${idade} anos` : '—',
       whatsapp: m.whatsapp || '—',
     }))
-    baixarPdfDoc(
+    return (
       <ListaPDF
         titulo="Aniversariantes"
         subtitulo={nomeMes(mes)}
@@ -77,8 +75,7 @@ export function BirthdaysPage() {
           { titulo: 'WhatsApp', chave: 'whatsapp', flex: 1.4 },
         ]}
         linhas={linhas}
-      />,
-      `aniversariantes-${String(mes).padStart(2, '0')}.pdf`,
+      />
     )
   }
 
@@ -95,19 +92,14 @@ export function BirthdaysPage() {
         </div>
         <Group align="flex-end" gap="sm">
           <Select label="Mês" w={150} data={opcoesMes} value={String(mes)} onChange={(v) => v && setMes(Number(v))} allowDeselect={false} />
-          <Tooltip label="Exportar PDF">
-            <ActionIcon variant="subtle" color="gray" size="lg" disabled={aniversariantes.length === 0} onClick={exportarPdf} aria-label="Exportar PDF">
-              <IconFileTypePdf size={20} />
-            </ActionIcon>
-          </Tooltip>
-          <Button
-            color="green"
-            leftSection={<IconBrandWhatsapp size={18} />}
+          <ExportarPdf
+            documento={construirPdf}
+            nomeArquivo={`aniversariantes-${String(mes).padStart(2, '0')}.pdf`}
+            legenda={`Aniversariantes de ${nomeMes(mes)} — ${nomeParoquia}`}
+            telefonePadrao={paroquia?.contato}
+            tipoLog="pdf-aniversariantes"
             disabled={aniversariantes.length === 0}
-            onClick={() => setModal({ titulo: `Parabéns de ${nomeMes(mes)}`, mensagens: mensagensDe(aniversariantes) })}
-          >
-            Enviar a todos
-          </Button>
+          />
         </Group>
       </Group>
 

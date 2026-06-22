@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -15,7 +14,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -28,7 +26,6 @@ import {
   IconAlertCircle,
   IconBuildingChurch,
   IconCalendarEvent,
-  IconFileTypePdf,
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Comunidade, ConfigParoquia } from '../lib/types'
@@ -36,7 +33,7 @@ import { formatarHora, DIAS_PLURAL, type Regra } from '../lib/celebracao'
 import { tituloCaso, mascaraTelefone } from '../lib/texto'
 import { CelebrationRulesDrawer } from '../components/CelebrationRulesDrawer'
 import { ListaPDF } from '../pdf/ListaPDF'
-import { baixarPdfDoc } from '../pdf/baixar'
+import { ExportarPdf } from '../components/ExportarPdf'
 import brasaoPadrao from '../assets/brasao.png'
 
 type FormValores = {
@@ -159,7 +156,7 @@ export function CommunitiesPage() {
     })
   }
 
-  function exportarPdf() {
+  function construirPdf() {
     const linhas = (data ?? []).map((c) => ({
       nome: c.nome,
       padroeiro: c.nomePadroeiro || '—',
@@ -168,7 +165,7 @@ export function CommunitiesPage() {
       celebracoes: diasPadrao(c.id) || '—',
       situacao: c.ativo ? 'Ativa' : 'Inativa',
     }))
-    baixarPdfDoc(
+    return (
       <ListaPDF
         titulo="Comunidades"
         subtitulo={`${linhas.length} cadastrada(s)`}
@@ -185,8 +182,7 @@ export function CommunitiesPage() {
           { titulo: 'Situação', chave: 'situacao', flex: 0.8 },
         ]}
         linhas={linhas}
-      />,
-      'comunidades.pdf',
+      />
     )
   }
 
@@ -200,11 +196,14 @@ export function CommunitiesPage() {
           <Text c="dimmed" size="sm">{data ? `${data.length} cadastrada(s)` : 'Cadastro das comunidades/capelas'}</Text>
         </div>
         <Group gap="xs">
-          <Tooltip label="Exportar PDF">
-            <ActionIcon variant="subtle" color="gray" size="lg" onClick={exportarPdf} disabled={!data?.length} aria-label="Exportar PDF">
-              <IconFileTypePdf size={20} />
-            </ActionIcon>
-          </Tooltip>
+          <ExportarPdf
+            documento={construirPdf}
+            nomeArquivo="comunidades.pdf"
+            legenda={`Relação de comunidades — ${paroquia?.nomeParoquia ?? 'Paróquia'}`}
+            telefonePadrao={paroquia?.contato}
+            tipoLog="pdf-comunidades"
+            disabled={!data?.length}
+          />
           <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Nova comunidade</Button>
         </Group>
       </Group>

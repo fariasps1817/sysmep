@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -15,7 +14,6 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { modals } from '@mantine/modals'
@@ -28,7 +26,6 @@ import {
   IconAlertCircle,
   IconUserOff,
   IconCalendarOff,
-  IconFileTypePdf,
 } from '@tabler/icons-react'
 import { api } from '../lib/api'
 import type { Ministro, ConfigParoquia } from '../lib/types'
@@ -37,7 +34,7 @@ import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
 import { ListaPDF } from '../pdf/ListaPDF'
-import { baixarPdfDoc } from '../pdf/baixar'
+import { ExportarPdf } from '../components/ExportarPdf'
 import brasaoPadrao from '../assets/brasao.png'
 
 type FormValores = {
@@ -165,7 +162,7 @@ export function MinistersPage() {
     })
   }
 
-  function exportarPdf() {
+  function construirPdf() {
     const linhas = (data ?? []).map((m) => ({
       nome: m.nomeCompleto,
       telefone: m.whatsapp || '—',
@@ -173,7 +170,7 @@ export function MinistersPage() {
       mesc: m.ministroEucaristia ? 'Sim' : 'Não',
       status: m.ativo ? 'Ativo' : 'Inativo',
     }))
-    baixarPdfDoc(
+    return (
       <ListaPDF
         titulo="Ministros da Palavra"
         subtitulo={`${linhas.length} cadastrado(s)`}
@@ -188,8 +185,7 @@ export function MinistersPage() {
           { titulo: 'Status', chave: 'status', flex: 0.9 },
         ]}
         linhas={linhas}
-      />,
-      'ministros.pdf',
+      />
     )
   }
 
@@ -205,11 +201,14 @@ export function MinistersPage() {
           </Text>
         </div>
         <Group gap="xs">
-          <Tooltip label="Exportar PDF">
-            <ActionIcon variant="subtle" color="gray" size="lg" onClick={exportarPdf} disabled={!data?.length} aria-label="Exportar PDF">
-              <IconFileTypePdf size={20} />
-            </ActionIcon>
-          </Tooltip>
+          <ExportarPdf
+            documento={construirPdf}
+            nomeArquivo="ministros.pdf"
+            legenda={`Relação de ministros — ${paroquia?.nomeParoquia ?? 'Paróquia'}`}
+            telefonePadrao={paroquia?.contato}
+            tipoLog="pdf-ministros"
+            disabled={!data?.length}
+          />
           <Button leftSection={<IconPlus size={18} />} onClick={abrirNovo}>Novo ministro</Button>
         </Group>
       </Group>
