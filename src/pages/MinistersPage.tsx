@@ -311,8 +311,8 @@ export function MinistersPage() {
               />
             </Group>
             <Group>
-              <Switch label="Também MESC" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
-              <Switch label="Ativo para escala" {...form.getInputProps('ativo', { type: 'checkbox' })} />
+              <Switch label="MESC" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
+              <Switch label="Ativo" {...form.getInputProps('ativo', { type: 'checkbox' })} />
             </Group>
             <Group justify="flex-end" mt="sm">
               <Button variant="default" onClick={fechar}>Cancelar</Button>
