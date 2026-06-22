@@ -58,8 +58,10 @@ export function mensagemAniversario(
   nomeParoquia: string,
 ): string {
   return (
-    `🎂 Feliz aniversário, ${saudacao(tratamento, nome)}! 🎉\n\n` +
-    `Que Deus abençoe sua vida, sua família e seu ministério. ` +
-    `Com carinho, ${nomeParoquia}. 🙏`
+    `🎂 *Feliz aniversário*, 🎉\n` +
+    `${saudacao(tratamento, nome)}!\n\n` +
+    `Que Deus abençoe sua vida, sua família e seu ministério.\n\n` +
+    `Com carinho,\n` +
+    `Coordenação dos Ministros Extraordinários da Palavra, ${nomeParoquia} 🙏`
   )
 }
