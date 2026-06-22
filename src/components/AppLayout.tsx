@@ -14,6 +14,7 @@ import {
   rem,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
+import { notifications } from '@mantine/notifications'
 import {
   IconHome,
   IconUsers,
@@ -27,6 +28,7 @@ import {
   IconKey,
 } from '@tabler/icons-react'
 import { useAuth } from '../lib/auth'
+import { useInatividade } from '../lib/useInatividade'
 import brasao from '../assets/brasao.png'
 
 const itensMenu = [
@@ -49,6 +51,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
     await logout()
     navigate('/login', { replace: true })
   }
+
+  // Logout automático após 20 minutos sem atividade.
+  useInatividade(true, 20, async () => {
+    await logout()
+    notifications.show({
+      color: 'yellow',
+      title: 'Sessão expirada',
+      message: 'Você foi desconectado por inatividade.',
+    })
+    navigate('/login', { replace: true })
+  })
 
   return (
     <AppShell

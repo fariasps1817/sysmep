@@ -4,7 +4,7 @@ import { parse, serialize } from 'cookie'
 import { conexaoSegura } from './http'
 
 const NOME_COOKIE = 'sysmep_token'
-const VALIDADE_SEGUNDOS = 8 * 60 * 60 // 8 horas
+const VALIDADE_SEGUNDOS = 60 * 60 // 1 hora (expiração absoluta do token)
 
 export type SessaoPayload = {
   id: number
@@ -38,12 +38,13 @@ export function lerSessao(event: HandlerEvent): SessaoPayload | null {
 }
 
 export function cookieSessao(token: string, event: HandlerEvent): string {
+  // Sem maxAge/expires => cookie de SESSÃO: o navegador o apaga ao ser fechado.
+  // (A expiração absoluta fica por conta do exp do próprio token JWT.)
   return serialize(NOME_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: conexaoSegura(event),
     path: '/',
-    maxAge: VALIDADE_SEGUNDOS,
   })
 }
 

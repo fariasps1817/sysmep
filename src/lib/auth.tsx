@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api, ApiError } from './api'
+import { api, ApiError, configurar401 } from './api'
 
 export type Operador = {
   id: number
@@ -22,6 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
+    // Sessão expirada em qualquer chamada protegida -> derruba para a tela de login.
+    configurar401(() => setOperador(null))
     api
       .get<{ operador: Operador }>('/auth/me')
       .then((r) => setOperador(r.operador))

@@ -9,6 +9,12 @@ export class ApiError extends Error {
   }
 }
 
+// Callback chamado quando uma chamada protegida retorna 401 (sessão expirada).
+let on401: (() => void) | null = null
+export function configurar401(fn: () => void) {
+  on401 = fn
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: 'include',
@@ -30,6 +36,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
+    // Sessão expirada numa chamada protegida (não no login/checagem inicial)
+    if (res.status === 401 && !path.startsWith('/auth/')) on401?.()
     const msg =
       (body && typeof body === 'object' && 'erro' in body && (body as { erro?: string }).erro) ||
       `Erro ${res.status}`
