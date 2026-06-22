@@ -67,6 +67,7 @@ export function MinistersPage() {
   const [dispDe, setDispDe] = useState<Ministro | null>(null)
   const [detalheId, setDetalheId] = useState<number | null>(null)
   const [accNomeCurto, setAccNomeCurto] = useState<string | null>(null)
+  const [nomeCurtoTocado, setNomeCurtoTocado] = useState(false)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -136,15 +137,18 @@ export function MinistersPage() {
     form.setValues(valoresIniciais)
     form.resetDirty()
     setAccNomeCurto(null)
+    setNomeCurtoTocado(false)
     setAberto(true)
   }
 
   function abrirEdicao(m: Ministro) {
     setEditando(m)
     setAccNomeCurto(null)
+    const curtoSalvo = (m.nomeCurto ?? '').trim()
+    setNomeCurtoTocado(curtoSalvo.length > 0)
     form.setValues({
       nomeCompleto: m.nomeCompleto,
-      nomeCurto: m.nomeCurto ?? '',
+      nomeCurto: curtoSalvo || sugestaoNomeCurto(m.nomeCompleto),
       dataNascimento: isoParaBR(m.dataNascimento),
       whatsapp: mascaraTelefone(m.whatsapp ?? ''),
       bairro: m.bairro ?? '',
@@ -287,20 +291,16 @@ export function MinistersPage() {
               withAsterisk
               value={form.values.nomeCompleto}
               onChange={(e) => form.setFieldValue('nomeCompleto', e.currentTarget.value)}
-              onBlur={(e) => form.setFieldValue('nomeCompleto', tituloCaso(e.currentTarget.value))}
+              onBlur={(e) => {
+                const t = tituloCaso(e.currentTarget.value)
+                form.setFieldValue('nomeCompleto', t)
+                // sugere o nome curto automaticamente, enquanto o operador não o editar
+                if (!nomeCurtoTocado) form.setFieldValue('nomeCurto', sugestaoNomeCurto(t))
+              }}
               error={form.errors.nomeCompleto}
             />
 
-            <Accordion
-              variant="contained"
-              value={accNomeCurto}
-              onChange={(v) => {
-                setAccNomeCurto(v)
-                if (v === 'nc' && !form.values.nomeCurto.trim()) {
-                  form.setFieldValue('nomeCurto', sugestaoNomeCurto(form.values.nomeCompleto))
-                }
-              }}
-            >
+            <Accordion variant="contained" value={accNomeCurto} onChange={setAccNomeCurto}>
               <Accordion.Item value="nc">
                 <Accordion.Control>
                   <Text size="sm">
@@ -309,11 +309,13 @@ export function MinistersPage() {
                 </Accordion.Control>
                 <Accordion.Panel>
                   <TextInput
-//                    label="Como é conhecido (aparece na escala e no PDF)"
+                    label="Como é conhecido (aparece na escala e no PDF)"
                     placeholder={sugestaoNomeCurto(form.values.nomeCompleto) || 'Ex.: Netinho'}
-                    description={`Sugestão automática: ${sugestaoNomeCurto(form.values.nomeCompleto) || '—'}`}
                     value={form.values.nomeCurto}
-                    onChange={(e) => form.setFieldValue('nomeCurto', e.currentTarget.value)}
+                    onChange={(e) => {
+                      setNomeCurtoTocado(true)
+                      form.setFieldValue('nomeCurto', e.currentTarget.value)
+                    }}
                     onBlur={(e) => form.setFieldValue('nomeCurto', tituloCaso(e.currentTarget.value))}
                   />
                 </Accordion.Panel>
