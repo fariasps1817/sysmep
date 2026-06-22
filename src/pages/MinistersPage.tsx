@@ -309,7 +309,6 @@ export function MinistersPage() {
                 </Accordion.Control>
                 <Accordion.Panel>
                   <TextInput
-                    label="Como é conhecido (aparece na escala e no PDF)"
                     placeholder={sugestaoNomeCurto(form.values.nomeCompleto) || 'Ex.: Netinho'}
                     value={form.values.nomeCurto}
                     onChange={(e) => {
