@@ -310,7 +310,7 @@ export function MinistersPage() {
                 error={form.errors.ordenadoEm}
               />
             </Group>
-            <Group>
+            <Group grow>
               <Switch label="MESC" {...form.getInputProps('ministroEucaristia', { type: 'checkbox' })} />
               <Switch label="Ativo" {...form.getInputProps('ativo', { type: 'checkbox' })} />
             </Group>
