@@ -1,6 +1,7 @@
 export type Ministro = {
   id: number
   nomeCompleto: string
+  nomeCurto: string | null
   tratamento: string | null
   dataNascimento: string | null
   whatsapp: string | null

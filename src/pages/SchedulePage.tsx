@@ -39,6 +39,7 @@ import { DIAS_CURTOS } from '../lib/celebracao'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { deISO } from '../lib/datas'
 import { normalizarWhatsapp } from '../lib/whatsapp'
+import { nomeEscala } from '../lib/texto'
 import { mensagemMinistro, mensagemRepresentante } from '../lib/mensagens'
 import { EnvioWhatsappModal, type MensagemEnvio } from '../components/EnvioWhatsappModal'
 import { expandirMes } from '../scheduler/expandir'
@@ -95,6 +96,8 @@ export function SchedulePage() {
 
   const ministrosAtivos = useMemo(() => (ministros ?? []).filter((m) => m.ativo), [ministros])
   const nomeMinistro = useMemo(() => new Map((ministros ?? []).map((m) => [m.id, m.nomeCompleto])), [ministros])
+  // Nome usado na escala/PDF (curto, ou sugestão pela 2ª palavra)
+  const nomeEscalaMap = useMemo(() => new Map((ministros ?? []).map((m) => [m.id, nomeEscala(m.nomeCompleto, m.nomeCurto)])), [ministros])
   const ministroById = useMemo(() => new Map((ministros ?? []).map((m) => [m.id, m])), [ministros])
   const comunidadeById = useMemo(() => new Map((comunidades ?? []).map((c) => [c.id, c])), [comunidades])
   const restricoesPorMinistro = useMemo(() => {
@@ -263,7 +266,7 @@ export function SchedulePage() {
     for (const s of palavraSlots) {
       const mid = linhas[s.id]?.ministerId ?? null
       const arr = porCom.get(s.communityId) ?? []
-      arr.push({ data: s.data, horario: s.horario, ministroNome: mid != null ? nomeMinistro.get(mid) ?? null : null })
+      arr.push({ data: s.data, horario: s.horario, ministroNome: mid != null ? nomeEscalaMap.get(mid) ?? null : null })
       porCom.set(s.communityId, arr)
     }
     const mensagens: MensagemEnvio[] = []
@@ -294,7 +297,7 @@ export function SchedulePage() {
         horario: sl.horario,
         communityNome: sl.communityNome,
         tipo: sl.tipo,
-        ministroNome: mid != null ? nomeMinistro.get(mid) ?? null : null,
+        ministroNome: mid != null ? nomeEscalaMap.get(mid) ?? null : null,
       })
     }
     for (const k of Object.keys(porDia)) {

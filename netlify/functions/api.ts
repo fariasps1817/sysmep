@@ -114,6 +114,7 @@ async function ministersHandler(event: HandlerEvent, metodo: string, id?: number
 function montarMinistro(b: Record<string, unknown>, parcial = false) {
   const dados: Record<string, unknown> = {
     nomeCompleto: str(b.nomeCompleto),
+    nomeCurto: b.nomeCurto === null ? null : str(b.nomeCurto),
     tratamento: str(b.tratamento),
     dataNascimento: str(b.dataNascimento),
     whatsapp: str(b.whatsapp),

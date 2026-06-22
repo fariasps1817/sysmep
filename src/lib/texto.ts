@@ -15,6 +15,18 @@ export function tituloCaso(s: string): string {
     .join(' ')
 }
 
+// Sugestão de "nome curto": a 2ª palavra significativa (pulando de/da/do...).
+export function sugestaoNomeCurto(nomeCompleto: string): string {
+  const palavras = (nomeCompleto ?? '').trim().split(/\s+/).filter(Boolean)
+  const significativas = palavras.filter((p) => !CONECTIVOS.has(p.toLowerCase()))
+  return significativas[1] ?? significativas[0] ?? palavras[0] ?? ''
+}
+
+// Nome usado na escala/PDF: o nome curto informado ou, na falta, a sugestão.
+export function nomeEscala(nomeCompleto: string, nomeCurto: string | null | undefined): string {
+  return (nomeCurto ?? '').trim() || sugestaoNomeCurto(nomeCompleto)
+}
+
 export function somenteDigitos(s: string): string {
   return (s ?? '').replace(/\D/g, '')
 }

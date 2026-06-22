@@ -38,7 +38,8 @@ export const parishSettings = pgTable('parish_settings', {
 export const ministers = pgTable('ministers', {
   id: serial('id').primaryKey(),
   nomeCompleto: text('nome_completo').notNull(),
-  tratamento: text('tratamento'), // ex.: "Ministro", "Ministra", "Sr.", "Sra."
+  nomeCurto: text('nome_curto'), // como é conhecido; usado na escala/PDF
+  tratamento: text('tratamento'), // (legado) ex.: "Ministro", "Ministra"
   dataNascimento: date('data_nascimento', { mode: 'string' }),
   whatsapp: text('whatsapp'),
   bairro: text('bairro'),

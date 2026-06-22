@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Accordion,
   Alert,
   Badge,
   Button,
@@ -30,7 +31,7 @@ import {
 import { api } from '../lib/api'
 import type { Ministro, ConfigParoquia } from '../lib/types'
 import { formatarBR } from '../lib/datas'
-import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR } from '../lib/texto'
+import { tituloCaso, mascaraTelefone, mascaraData, brParaISO, isoParaBR, sugestaoNomeCurto, nomeEscala } from '../lib/texto'
 import type { Indisponibilidade } from '../lib/disponibilidade'
 import { MinisterAvailabilityDrawer } from '../components/MinisterAvailabilityDrawer'
 import { ListaPDF } from '../pdf/ListaPDF'
@@ -39,6 +40,7 @@ import brasaoPadrao from '../assets/brasao.png'
 
 type FormValores = {
   nomeCompleto: string
+  nomeCurto: string
   dataNascimento: string
   whatsapp: string
   bairro: string
@@ -49,6 +51,7 @@ type FormValores = {
 
 const valoresIniciais: FormValores = {
   nomeCompleto: '',
+  nomeCurto: '',
   dataNascimento: '',
   whatsapp: '',
   bairro: '',
@@ -63,6 +66,7 @@ export function MinistersPage() {
   const [editando, setEditando] = useState<Ministro | null>(null)
   const [dispDe, setDispDe] = useState<Ministro | null>(null)
   const [detalheId, setDetalheId] = useState<number | null>(null)
+  const [accNomeCurto, setAccNomeCurto] = useState<string | null>(null)
 
   const form = useForm<FormValores>({
     initialValues: valoresIniciais,
@@ -93,6 +97,7 @@ export function MinistersPage() {
     mutationFn: (valores: FormValores) => {
       const payload = {
         nomeCompleto: tituloCaso(valores.nomeCompleto),
+        nomeCurto: valores.nomeCurto.trim() || null,
         dataNascimento: brParaISO(valores.dataNascimento),
         whatsapp: valores.whatsapp,
         bairro: valores.bairro,
@@ -130,13 +135,16 @@ export function MinistersPage() {
     setEditando(null)
     form.setValues(valoresIniciais)
     form.resetDirty()
+    setAccNomeCurto(null)
     setAberto(true)
   }
 
   function abrirEdicao(m: Ministro) {
     setEditando(m)
+    setAccNomeCurto(null)
     form.setValues({
       nomeCompleto: m.nomeCompleto,
+      nomeCurto: m.nomeCurto ?? '',
       dataNascimento: isoParaBR(m.dataNascimento),
       whatsapp: mascaraTelefone(m.whatsapp ?? ''),
       bairro: m.bairro ?? '',
@@ -282,6 +290,36 @@ export function MinistersPage() {
               onBlur={(e) => form.setFieldValue('nomeCompleto', tituloCaso(e.currentTarget.value))}
               error={form.errors.nomeCompleto}
             />
+
+            <Accordion
+              variant="contained"
+              value={accNomeCurto}
+              onChange={(v) => {
+                setAccNomeCurto(v)
+                if (v === 'nc' && !form.values.nomeCurto.trim()) {
+                  form.setFieldValue('nomeCurto', sugestaoNomeCurto(form.values.nomeCompleto))
+                }
+              }}
+            >
+              <Accordion.Item value="nc">
+                <Accordion.Control>
+                  <Text size="sm">
+                    Nome curto na escala{form.values.nomeCurto ? `: ${form.values.nomeCurto}` : ' (opcional)'}
+                  </Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <TextInput
+                    label="Como é conhecido (aparece na escala e no PDF)"
+                    placeholder={sugestaoNomeCurto(form.values.nomeCompleto) || 'Ex.: Netinho'}
+                    description={`Sugestão automática: ${sugestaoNomeCurto(form.values.nomeCompleto) || '—'}`}
+                    value={form.values.nomeCurto}
+                    onChange={(e) => form.setFieldValue('nomeCurto', e.currentTarget.value)}
+                    onBlur={(e) => form.setFieldValue('nomeCurto', tituloCaso(e.currentTarget.value))}
+                  />
+                </Accordion.Panel>
+              </Accordion.Item>
+            </Accordion>
+
             <Group grow>
               <TextInput
                 label="WhatsApp"
@@ -326,6 +364,7 @@ export function MinistersPage() {
         {detalhe && (
           <Stack gap="sm">
             <Stack gap={6}>
+              <Group justify="space-between"><Text size="sm" c="dimmed">Nome na escala</Text><Text size="sm" fw={500}>{nomeEscala(detalhe.nomeCompleto, detalhe.nomeCurto)}</Text></Group>
               <Group justify="space-between"><Text size="sm" c="dimmed">WhatsApp</Text><Text size="sm" fw={500}>{detalhe.whatsapp || '—'}</Text></Group>
               <Group justify="space-between"><Text size="sm" c="dimmed">Bairro</Text><Text size="sm" fw={500}>{detalhe.bairro || '—'}</Text></Group>
               <Group justify="space-between"><Text size="sm" c="dimmed">Nascimento</Text><Text size="sm" fw={500}>{formatarBR(detalhe.dataNascimento)}</Text></Group>
