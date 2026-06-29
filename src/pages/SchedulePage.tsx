@@ -291,8 +291,8 @@ export function SchedulePage() {
   async function baixarPdf() {
     const porDia: Record<string, CelebracaoPDF[]> = {}
     for (const sl of slots) {
-      const isMissa = sl.tipo === 'missa'
-      const mid = isMissa ? null : linhas[sl.id]?.ministerId ?? null
+      if (sl.tipo === 'missa') continue // PDF mostra só as Celebrações da Palavra
+      const mid = linhas[sl.id]?.ministerId ?? null
       ;(porDia[sl.data] ??= []).push({
         horario: sl.horario,
         communityNome: sl.communityNome,
