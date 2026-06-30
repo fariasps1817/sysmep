@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Badge,
@@ -73,6 +73,9 @@ export function SchedulePage() {
   const [mes, setMes] = useState(inicial.mes)
   const [ano, setAno] = useState(inicial.ano)
   const [linhas, setLinhas] = useState<Record<string, LinhaInfo>>({})
+  // Espelho sempre atual de "linhas" (garante que o PDF use o estado mais recente)
+  const linhasRef = useRef(linhas)
+  linhasRef.current = linhas
   const [gerado, setGerado] = useState(false)
   const [status, setStatus] = useState<'rascunho' | 'publicada' | null>(null)
   const [scheduleId, setScheduleId] = useState<number | null>(null)
@@ -289,10 +292,11 @@ export function SchedulePage() {
   }
 
   async function baixarPdf() {
+    const atual = linhasRef.current // estado mais recente (inclui edições manuais)
     const porDia: Record<string, CelebracaoPDF[]> = {}
     for (const sl of slots) {
       if (sl.tipo === 'missa') continue // PDF mostra só as Celebrações da Palavra
-      const mid = linhas[sl.id]?.ministerId ?? null
+      const mid = atual[sl.id]?.ministerId ?? null
       ;(porDia[sl.data] ??= []).push({
         horario: sl.horario,
         communityNome: sl.communityNome,
