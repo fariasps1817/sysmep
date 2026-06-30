@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -11,10 +12,15 @@ import {
   Spoiler,
   Stack,
   Text,
+  Tooltip,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconBrandWhatsapp, IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-react'
 import { api } from '../lib/api'
+
+// Intervalo entre envios (evita que a META/WhatsApp interprete como spam).
+const INTERVALO_MS = 2500
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export type MensagemEnvio = {
   id: string
@@ -59,8 +65,9 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
     setEnviando(true)
     let ok = 0
     let falhas = 0
-    for (const m of mensagens) {
-      if (!m.para) continue
+    const aEnviar = mensagens.filter((m) => m.para)
+    for (let i = 0; i < aEnviar.length; i++) {
+      const m = aEnviar[i]
       setStatus((s) => ({ ...s, [m.id]: 'enviando' }))
       try {
         await api.post('/whatsapp/enviar', { para: m.para, mensagem: m.mensagem, tipo: m.tipo, destinatarioId: m.destinatarioId })
@@ -71,6 +78,7 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
         setErros((er) => ({ ...er, [m.id]: (e as Error).message }))
         falhas++
       }
+      if (i < aEnviar.length - 1) await sleep(INTERVALO_MS) // espera entre um envio e outro
     }
     setEnviando(false)
     setConcluido(true)
@@ -79,6 +87,20 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
       title: 'Envio concluído',
       message: `${ok} enviada(s)${falhas ? `, ${falhas} com erro` : ''}${semNumero ? `, ${semNumero} sem número` : ''}.`,
     })
+  }
+
+  async function enviarUm(m: MensagemEnvio) {
+    if (!m.para) return
+    setStatus((s) => ({ ...s, [m.id]: 'enviando' }))
+    try {
+      await api.post('/whatsapp/enviar', { para: m.para, mensagem: m.mensagem, tipo: m.tipo, destinatarioId: m.destinatarioId })
+      setStatus((s) => ({ ...s, [m.id]: 'ok' }))
+      notifications.show({ color: 'teal', message: `Mensagem enviada para ${m.label}.` })
+    } catch (e) {
+      setStatus((s) => ({ ...s, [m.id]: 'erro' }))
+      setErros((er) => ({ ...er, [m.id]: (e as Error).message }))
+      notifications.show({ color: 'red', title: 'Falha ao enviar', message: (e as Error).message })
+    }
   }
 
   function badge(st: Status) {
@@ -109,13 +131,37 @@ export function EnvioWhatsappModal({ opened, onClose, titulo, descricao, mensage
           </Alert>
         )}
 
+        {enviando && (
+          <Group gap="xs" wrap="nowrap">
+            <Loader size="sm" />
+            <Text size="sm">Enviando mensagens… aguarde. Há um intervalo entre cada envio para evitar bloqueio.</Text>
+          </Group>
+        )}
+
         <ScrollArea.Autosize mah={360}>
           <Stack gap="xs">
             {mensagens.map((m) => (
               <Paper key={m.id} withBorder p="sm" radius="md">
                 <Group justify="space-between" wrap="nowrap" mb={4}>
                   <Text size="sm" fw={600}>{m.label}</Text>
-                  {badge(status[m.id] ?? 'pendente')}
+                  <Group gap="xs" wrap="nowrap">
+                    {badge(status[m.id] ?? 'pendente')}
+                    {m.para && (
+                      <Tooltip label="Enviar só para este">
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="green"
+                          loading={status[m.id] === 'enviando'}
+                          disabled={enviando}
+                          onClick={() => enviarUm(m)}
+                          aria-label="Enviar para este"
+                        >
+                          <IconBrandWhatsapp size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Group>
                 <Text size="xs" c="dimmed">{m.para ? `📲 ${m.para}` : 'Sem número'}</Text>
                 <Spoiler maxHeight={0} showLabel="ver mensagem" hideLabel="ocultar" mt={4}>
